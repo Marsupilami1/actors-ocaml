@@ -3,7 +3,7 @@
 #+AUTHOR: Martin Andrieux
 
 * Compiling the project
-You can compile ~actors-ocaml~ simply by running and run the test executable with
+You can compile ~actors-ocaml~ and run the test executable simply by running:
 #+begin_src bash
 $ dune build
 $ dune exec bin/main.exe

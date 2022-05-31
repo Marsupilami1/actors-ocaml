@@ -1,8 +1,3 @@
 (library
-  (name promise)
-  (modules promise))
-
-(library
- (name actor)
- (modules actor)
- (libraries promise))
+ (name actorsocaml)
+ (public_name actorsocaml))

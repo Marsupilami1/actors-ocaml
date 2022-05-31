@@ -1,3 +1,4 @@
 (test
+ (libraries actorsocaml)
  (name test)
- (libraries actor))
+ (modules test))

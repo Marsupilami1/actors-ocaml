@@ -1,0 +1,10 @@
+#+TITLE: actors-ocaml
+#+DESCRIPTION: An actor library for OCaml 5
+#+AUTHOR: Martin Andrieux
+
+* Compiling the project
+You can compile ~actors-ocaml~ simply by running and run the test executable with
+#+begin_src bash
+$ dune build
+$ dune exec bin/main.exe
+#+end_src

@@ -1,6 +1,6 @@
 (lang dune 3.2)
 
-(name acaml)
+(name actors-ocaml)
 
 (generate_opam_files true)
 
@@ -9,7 +9,7 @@
 (maintainers "Martin Andrieux")
 
 (package
- (name acaml)
+ (name actors-ocaml)
  (synopsis "An actor library for OCaml 5")
  (description "An actor library for OCaml 5")
  (depends ocaml dune))

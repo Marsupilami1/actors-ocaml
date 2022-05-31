@@ -6,5 +6,5 @@
 You can compile ~actors-ocaml~ and run the test executable simply by running:
 #+begin_src bash
 $ dune build
-$ dune exec bin/main.exe
+$ dune test
 #+end_src

@@ -1,2 +1,3 @@
 (test
- (name acaml))
+ (name test)
+ (libraries actor))

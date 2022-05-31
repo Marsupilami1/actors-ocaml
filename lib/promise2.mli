@@ -1,8 +1,6 @@
 type 'a t
-val print_status : 'a t -> unit
 val make_empty : unit -> 'a t
-val fill : (unit -> 'a) -> 'a t -> unit
-val forward : (unit -> 'a t) -> 'a t -> unit
+val fork : (unit -> 'a) * 'a t -> unit
 val get : 'a t -> ('a, exn) result
 val get_val : 'a t -> 'a
 val pure : 'a -> 'a t

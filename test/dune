@@ -1,4 +1,4 @@
 (test
- (libraries actorsocaml)
+ (libraries actorsocaml unix)
  (name test)
  (modules test))

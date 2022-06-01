@@ -68,7 +68,7 @@ Trying to fill in the same promise twice raises a ~Promise__Multiple_Write~ erro
 *** Reading
 You have two ways to read the value from a promise:
 - ~wait_and_get~ is blocking, so you can use it if someone else is doing the computation in /parallel/
-- ~wait~ will throw the effect ~NotReady p~ if the value is not available. It can then be handled by a scheduler to compute the value /concurently/.
+- ~get~ will throw the effect ~NotReady p~ if the value is not available. It can then be handled by a scheduler to compute the value /concurently/.
 
 In both case, if the value will be returned if it is available
 
@@ -88,14 +88,14 @@ type ('s, 'a) t = {
 }
 #+end_src
 
-It is parameterized on ~'s~ and ~'a~.
-- ~'s~ is the type of messages
-- ~'a~ is the return type of the methods
+It is parameterized on ~s~ and ~a~.
+- ~s~ is the type of messages
+- ~a~ is the return type of the methods
 
 It is not possible at this time to have multiple return types (you can use a sum type if you need it).
 
 **** IDEA Better type for messages
-A better solution would be to consider ~'a 's~ : a method which returns something of type ~'a~. It should be possible with a GADT like so:
+A better solution would be to consider ~a s~ : a method which returns something of type ~a~. It should be possible with a GADT like so:
 #+begin_src ocaml
 type 'a message =
   | Fib : int -> int message

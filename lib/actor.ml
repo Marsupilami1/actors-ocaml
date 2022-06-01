@@ -34,51 +34,52 @@ let create methods = {
   methods = methods
 }
 
-let send actor message =
+let send self message =
   let p = Promise.create () in
-  Queue.push (message, p) actor.mail_box;
+  Queue.push (message, p) self.mail_box;
   p
 
-let get_message actor =
-  Queue.take_opt actor.mail_box
+let get_message self =
+  Queue.take_opt self.mail_box
 
-let push_process actor process =
-  Queue.push process actor.processes
+let push_process self process =
+  Queue.push process self.processes
 
-let get_process actor =
-  Queue.take_opt actor.processes
+let get_process self =
+  Queue.take_opt self.processes
 
-let read_mails actor =
-  if Queue.is_empty actor.processes then Domain.cpu_relax ();
-  match get_message actor with
+(* TODO: read all the mails and not just one *)
+let read_mails self =
+  if Queue.is_empty self.processes then Domain.cpu_relax ();
+  match get_message self with
   | None -> ()
   | Some (m, p) ->
-    push_process actor @@ Fill(p, fun () -> actor.methods actor m)
+    push_process self @@ Fill(p, fun () -> self.methods self m)
 
-let manage_next_process actor =
+let manage_next_process self =
   (* Never empty because of the mail_reader *)
-  let process = Option.get @@ get_process actor in
+  let process = Option.get @@ get_process self in
   begin
     match process with
     | MailReader ->
-      read_mails actor;
-      push_process actor MailReader
+      read_mails self;
+      push_process self MailReader
     | Fill (p, f) ->
       let v = f () in Promise.fill p v
     | Computation f -> f ()
   end
 
-let run actor = ignore @@ Domain.spawn (fun _ ->
-    push_process actor MailReader;
+let run self = ignore @@ Domain.spawn (fun _ ->
+    push_process self MailReader;
     let rec loop () =
-      match_with manage_next_process actor {
+      match_with manage_next_process self {
         retc = (fun _ -> loop ());
         exnc = raise;
         effc = fun (type a) (e : a Effect.t) ->
           match e with
           | Promise.NotReady p -> Some (
               fun (k : (a, _) continuation) ->
-                push_process actor (
+                push_process self (
                   Computation(fun _ ->
                       continue k (Promise.get p))
                 );

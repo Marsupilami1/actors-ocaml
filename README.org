@@ -8,3 +8,111 @@ You can compile ~actors-ocaml~ and run the test executable simply by running:
 $ dune build
 $ dune test
 #+end_src
+
+* Write a program using actors
+Let's write a simple programs to calculate the fibonacci numbers.
+
+First, we want a method acting like a function ~fib : int -> int~. To do this, we create the following type:
+#+begin_src ocaml
+type message = Fib of int
+#+end_src
+
+Objects of type ~message~ will be sent to the actor. It mean "The actor have a function Fib, which takes an integer"
+
+We cannot (for the moment) specify a return type for the function ~fib~ (see the IDEA below)
+
+Once declared, we can define the ~fib~ function:
+#+begin_src ocaml
+let methods self = function
+  | Fib n ->
+    if n < 2 then n else begin
+      let p1 = Actor.send self (Fib (n - 1)) in
+      let p2 = Actor.send self (Fib (n - 2)) in
+      Promise.get p1 + Promise.get p2
+    end
+#+end_src
+
+And we can finally create the actor with ~Actor.create~:
+#+begin_src ocaml
+let actor = Actor.create methods
+#+end_src
+
+The main function could look like:
+#+begin_src ocaml
+let _ =
+  Actor.run actor;
+  let p = Actor.send actor (Fib 6) in
+  Printf.printf "fib(6) = %d\n" @@ Promise.wait_and_get p
+#+end_src
+
+
+* Explanations
+** Promises
+*** Type
+Promise are boxes where you can write only once, so something like
+#+begin_src ocaml
+type 'a promise = 'a option ref
+#+end_src
+
+For more readability, we define a new type (not exported anyway):
+#+begin_src ocaml
+type 'a status = Empty | Filled of 'a
+type 'a t = 'a status ref
+#+end_src
+
+*** Creating and writing
+You can create a promise with the ~create~ function, and fill it with ~fill~.
+
+Trying to fill in the same promise twice raises a ~Promise__Multiple_Write~ error.
+
+*** Reading
+You have two ways to read the value from a promise:
+- ~wait_and_get~ is blocking, so you can use it if someone else is doing the computation in /parallel/
+- ~wait~ will throw the effect ~NotReady p~ if the value is not available. It can then be handled by a scheduler to compute the value /concurently/.
+
+In both case, if the value will be returned if it is available
+
+** Actors
+*** Type
+An actor is (for the moment) only a bunch of functions, a mailbox and a scheduler, it's definition is:
+
+#+begin_src ocaml
+type ('s, 'a) t = {
+  (* message and promise to write the result in *)
+  mail_box : ('s * 'a Promise.t) Queue.t;
+  (* list of processes running concurently *)
+  processes : 'a process Queue.t;
+  (* different methods of the actor *)
+  (* represented by one unique function because of the sum type *)
+  methods : ('s, 'a) t -> 's -> 'a
+}
+#+end_src
+
+It is parameterized on ~'s~ and ~'a~.
+- ~'s~ is the type of messages
+- ~'a~ is the return type of the methods
+
+It is not possible at this time to have multiple return types (you can use a sum type if you need it).
+
+**** IDEA Better type for messages
+A better solution would be to consider ~'a 's~ : a method which returns something of type ~'a~. It should be possible with a GADT like so:
+#+begin_src ocaml
+type 'a message =
+  | Fib : int -> int message
+  | Elem : 'a list -> 'a -> bool message
+  (* plus other methods... *)
+#+end_src
+
+But I don't know if it's possible to have an higher-kinded type parameter in OCaml. In Haskell I would write an ~Actor~ of kind ~(* -> *) -> *~ where ~(* -> *)~ is the type of messages.
+
+*** Creation
+To create an actor, you only need to specify its methods (there's no shared memory for the moment).
+A method is a function which takes an actor (~self~) and a message.
+
+Do not use ~Promise.wait_and_get~ on a promise obtained by self, you'll get stuck on a value that will never be calculated.
+Maybe this will be ensured by the type system in the future.
+
+*** Execution
+To run an actor, just call the ~run~ function on it.
+It will spawn a new thread and run the scheduler.
+

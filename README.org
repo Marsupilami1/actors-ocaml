@@ -99,7 +99,7 @@ A better solution would be to consider ~a s~ : a method which returns something 
 #+begin_src ocaml
 type 'a message =
   | Fib : int -> int message
-  | Elem : 'a list -> 'a -> bool message
+  | Elem : 'a list * 'a -> bool message
   (* plus other methods... *)
 #+end_src
 

@@ -22,25 +22,30 @@ type 'a process =
 
 (* But the actor would be parameterized on 's, of kind (* -> *), *)
 (* I Don't know if it's possible in OCaml *)
-type ('s, 'a) t = {
+type ('m, 's, 'a) t = {
   mail_box : ('s * 'a Promise.t) Queue.t;
+  mail_mutex : Mutex.t;
   processes : 'a process Queue.t;
-  methods : ('s, 'a) t -> 's -> 'a
+  memory : 'm;
+  methods : ('m, 's, 'a) t -> 's -> 'a
 }
 
-let create methods = {
+let create memory methods = {
   mail_box = Queue.create ();
+  mail_mutex = Mutex.create ();
   processes = Queue.create ();
+  memory = memory;
   methods = methods
 }
 
 let send self message =
+  Mutex.lock self.mail_mutex;
   let p = Promise.create () in
   Queue.push (message, p) self.mail_box;
+  Mutex.unlock self.mail_mutex;
   p
 
-let get_message self =
-  Queue.take_opt self.mail_box
+let memory self = self.memory
 
 let push_process self process =
   Queue.push process self.processes
@@ -50,11 +55,15 @@ let get_process self =
 
 (* TODO: read all the mails and not just one *)
 let read_mails self =
+  (* Do not spam the mail box *)
+  Mutex.lock self.mail_mutex;
   if Queue.is_empty self.processes then Domain.cpu_relax ();
-  match get_message self with
-  | None -> ()
-  | Some (m, p) ->
-    push_process self @@ Fill(p, fun () -> self.methods self m)
+  Queue.iter (fun (m, p) ->
+      push_process self @@ Fill(p, fun () -> self.methods self m)
+    ) self.mail_box;
+  (* Mutex on mailbox ? *)
+  Queue.clear self.mail_box;
+  Mutex.unlock self.mail_mutex
 
 let manage_next_process self =
   (* Never empty because of the mail_reader *)

@@ -1,6 +1,7 @@
-type ('s, 'a) t
+type ('m, 's, 'a) t
 
-val create : (('s, 'a) t -> ('s -> 'a)) -> ('s, 'a) t
-val send : ('s, 'a) t -> 's -> 'a Promise.t
+val create : 'm -> (('m, 's, 'a) t -> ('s -> 'a)) -> ('m, 's, 'a) t
+val send : ('m, 's, 'a) t -> 's -> 'a Promise.t
+val memory : ('m, 's, 'a) t -> 'm
 
-val run : ('s, 'a) t -> unit
+val run : ('m, 's, 'a) t -> unit

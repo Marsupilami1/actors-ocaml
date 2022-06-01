@@ -26,6 +26,7 @@ type ('m, 's, 'a) t = {
   mail_box : ('s * 'a Promise.t) Queue.t;
   mail_mutex : Mutex.t;
   processes : 'a process Queue.t;
+  (* TODO: the memory should be attached to the Domain *)
   memory : 'm;
   methods : ('m, 's, 'a) t -> 's -> 'a
 }
@@ -53,7 +54,6 @@ let push_process self process =
 let get_process self =
   Queue.take_opt self.processes
 
-(* TODO: read all the mails and not just one *)
 let read_mails self =
   (* Do not spam the mail box *)
   Mutex.lock self.mail_mutex;

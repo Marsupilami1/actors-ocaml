@@ -35,18 +35,23 @@ Let&rsquo;s write a simple programs to calculate the fibonacci numbers.
 
 First, we want a method acting like a function `fib : int -> int`. To do this, we create the following module:
 
-    module MyMessage = struct
-      type 'a t =
-        |  Fib : int -> int t
-      type method_type = { m : 'a . 'a t -> 'a }
-    end
-    
-    module MyActor = Actor.Make(MyMessage)
+``` ocaml
+module MyMessage = struct
+  type 'a t =
+    |  Fib : int -> int t
+  type method_type = { m : 'a . 'a t -> 'a }
+end
+
+module MyActor = Actor.Make(MyMessage)
+```
+
 
 The type &rsquo;a t is the type of our message. It represents our different functions. The return type is `int`, because the type of `Fib n` is `int`.
 We could have define the `flip` function by adding the constructor:
 
+``` ocaml
     | Flip : ('a -> 'b -> 'c) * 'b * 'a -> 'c t
+```
 
 Once declared, we can define the `fib` function:
 

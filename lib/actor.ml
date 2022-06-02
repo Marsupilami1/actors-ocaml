@@ -31,11 +31,11 @@ type ('m, 's, 'a) t = {
   methods : ('m, 's, 'a) t -> 's -> 'a
 }
 
-let create memory methods = {
+let create init methods = {
   mail_box = Queue.create ();
   mail_mutex = Mutex.create ();
   processes = Queue.create ();
-  memory = memory;
+  memory = init ();
   methods = methods
 }
 

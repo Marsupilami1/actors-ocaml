@@ -3,7 +3,7 @@ open Actorsocaml
 type message =
   | Fib of int
 
-let memory = Array.make 20000 None
+let init () = Array.make 20000 None
 
 let methods self = function
   | Fib n ->
@@ -19,7 +19,7 @@ let methods self = function
       m.(n) <- Some res; res
     end
 
-let actor = Actor.create memory methods
+let actor = Actor.create init methods
 
 let _ =
   print_endline "-----TEST ACTOR-----";

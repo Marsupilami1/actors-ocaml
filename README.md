@@ -1,6 +1,4 @@
 # Actors-OCaml
-# Table of Contents
-
 # Compiling the project
 
 You can compile `actors-ocaml` and run the test executable simply by running:

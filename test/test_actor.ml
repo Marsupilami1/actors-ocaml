@@ -17,7 +17,7 @@ let methods self = function
       let v2 = Promise.get p2 in
       let res = v1 + v2 in
       m.(n) <- Some res;
-      Actor.set_memory self m;
+      (* Actor.set_memory self m; *)
       res
     end
 

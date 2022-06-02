@@ -88,10 +88,13 @@ let run self = ignore @@ Domain.spawn (fun _ ->
           match e with
           | Promise.NotReady p -> Some (
               fun (k : (a, _) continuation) ->
-                push_process self (
-                  Computation(fun _ ->
-                      continue k (Promise.get p))
-                );
+                (* The process is waiting for the promise to be filled *)
+                (* So we add a hook to this promise to pusn the process *)
+                (* back to the queue *)
+                Promise.add_hook p (fun v ->
+                    push_process self
+                      (Computation (fun _ -> continue k v))
+                  );
                 loop ();
             )
           | _ -> None

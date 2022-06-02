@@ -63,7 +63,7 @@ type 'a t = 'a status ref
 
 This type is fine for simple programs, but waiting processes have no way to know when the promise is filled.
 So we add a list of hooks to the empty future. These hooks will be executed when the promise it filled.
-Thanks to this, the scheduler can add a hook to a promise to put a waiting process back in the queue.
+Thanks to this, the scheduler can add a hook to a promise to put a waiting process back in the queue (Faster than pushing the process to the queue directly and reading the empty promise again).
 
 The real ~status~ type is:
 #+begin_src ocaml

@@ -6,3 +6,17 @@ val get : 'a t -> 'a
 val wait_and_get : 'a t -> 'a
 val fill : 'a t -> 'a -> unit
 val is_ready : 'a t -> bool
+
+val add_hook : 'a t -> ('a -> unit) -> unit
+
+val fmap : ('a -> 'b) -> 'a t -> 'b t
+val pure : 'a -> 'a t
+val join : 'a t t -> 'a t
+val bind : 'a t -> ('a -> 'b t) -> 'b t
+
+module Infix : sig
+  val (<$>) : ('a -> 'b) -> 'a t -> 'b t
+  val (<*>) : ('a -> 'b) t -> 'a t -> 'b t
+  val (>>=) : 'a t -> ('a -> 'b t) -> 'b t
+  val (=<<) : ('a -> 'b t) -> 'a t -> 'b t
+end

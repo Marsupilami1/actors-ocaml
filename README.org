@@ -61,6 +61,19 @@ type 'a status = Empty | Filled of 'a
 type 'a t = 'a status ref
 #+end_src
 
+This type is fine for simple programs, but waiting processes have no way to know when the promise is filled.
+So we add a list of hooks to the empty future. These hooks will be executed when the promise it filled.
+Thanks to this, the scheduler can add a hook to a promise to put a waiting process back in the queue.
+
+The real ~status~ type is:
+#+begin_src ocaml
+type 'a status =
+  | Empty of ('a -> unit) list
+  | Filled of 'a
+#+end_src
+As you can see, the hook takes a function ~a -> unit~, so it will receive the value of the future in argument.
+This is useful to define functions such as ~fmap~ and ~join~ (See ~Promise.Infix~).
+
 *** Creating and writing
 You can create a promise with the ~create~ function, and fill it with ~fill~.
 

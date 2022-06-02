@@ -2,3 +2,9 @@
  (libraries actorsocaml unix)
  (name test)
  (modules test))
+
+
+(test
+ (libraries actorsocaml)
+ (name test_promise)
+ (modules test_promise))

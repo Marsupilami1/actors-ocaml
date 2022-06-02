@@ -1,7 +1,7 @@
 (test
  (libraries actorsocaml unix)
- (name test)
- (modules test))
+ (name test_actor)
+ (modules test_actor))
 
 
 (test

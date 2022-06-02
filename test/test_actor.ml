@@ -22,7 +22,10 @@ let methods self = function
 let actor = Actor.create memory methods
 
 let _ =
+  print_endline "-----TEST ACTOR-----";
   Actor.run actor;
   let n = 42 in
   let p = Actor.send actor (Fib n) in
-  Printf.printf "fib(%d) = %d\n" n @@ Promise.wait_and_get p
+  assert (267914296 = Promise.wait_and_get p);
+  print_endline "Test passed";
+  print_endline "--------------------"

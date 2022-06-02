@@ -7,7 +7,7 @@ let init () = Array.make 20000 None
 
 let methods self = function
   | Fib n ->
-    let m = Actor.memory self in
+    let m = Actor.get_memory self in
     if m.(n) <> None then
       Option.get m.(n)
     else if n < 2 then n else begin
@@ -16,7 +16,9 @@ let methods self = function
       let p2 = Actor.send self (Fib (n - 2)) in
       let v2 = Promise.get p2 in
       let res = v1 + v2 in
-      m.(n) <- Some res; res
+      m.(n) <- Some res;
+      Actor.set_memory self m;
+      res
     end
 
 let actor = Actor.create init methods

@@ -27,7 +27,7 @@ type ('m, 's, 'a) t = {
   mail_mutex : Mutex.t;
   processes : 'a process Queue.t;
   (* TODO: the memory should be attached to the Domain *)
-  memory : 'm;
+  memory : 'm Domain.DLS.key;
   methods : ('m, 's, 'a) t -> 's -> 'a
 }
 
@@ -35,7 +35,7 @@ let create init methods = {
   mail_box = Queue.create ();
   mail_mutex = Mutex.create ();
   processes = Queue.create ();
-  memory = init ();
+  memory = Domain.DLS.new_key init;
   methods = methods
 }
 
@@ -46,7 +46,8 @@ let send self message =
   Mutex.unlock self.mail_mutex;
   p
 
-let memory self = self.memory
+let get_memory self = Domain.DLS.get self.memory
+let set_memory self memory = Domain.DLS.set self.memory memory
 
 let push_process self process =
   Queue.push process self.processes

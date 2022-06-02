@@ -3,8 +3,12 @@
  (name test_actor)
  (modules test_actor))
 
-
 (test
  (libraries actorsocaml)
  (name test_promise)
  (modules test_promise))
+
+(test
+ (libraries actorsocaml)
+ (name test_bench)
+ (modules test_bench))

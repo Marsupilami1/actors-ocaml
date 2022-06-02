@@ -13,7 +13,7 @@ let init () = Array.make 20000 None
 module MyActor = Actor.Make(MyMessage)
 
 let methods : type a . memory MyActor.t -> a MyMessage.t -> a = fun self -> function
-  | MyMessage.Fib n ->
+  | Fib n ->
     let m = MyActor.get_memory self in
     if m.(n) <> None then
       Option.get m.(n)

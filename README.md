@@ -146,8 +146,9 @@ It is parameterized on `'m`, which is the type of the shared memory.
 To create an actor, you only need to specify its methods and its shared memory.
 A method is a function which takes an actor (`self`) and a message.
 
-Do not use `Promise.wait_and_get` on a promise obtained by self, you&rsquo;ll get stuck on a value that will never be calculated.
+Do not use `Promise.wait_and_get` on a promise obtained by self, you'll get stuck on a value that will never be calculated.
 Maybe this will be ensured by the type system in the future.
+In general, you don't need to use `Promise.get`, `pure` and `bind` should be general enough for your code.
 
 ### Execution
 

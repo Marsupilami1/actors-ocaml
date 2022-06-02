@@ -196,3 +196,6 @@ let _ =
   let p = Promise.join @@ MyActor.send actor (Fib n) in
   Printf.printf "fib(%d) = %d" n @@ Promise.wait_and_get p;
 ```
+
+## PING PONG
+See `test/test_pingpong.ml`

@@ -9,6 +9,6 @@
  (modules test_promise))
 
 (test
- (libraries actorsocaml)
- (name test_bench)
- (modules test_bench))
+ (libraries actorsocaml unix)
+ (name test_pingpong)
+ (modules test_pingpong))

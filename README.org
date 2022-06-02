@@ -12,40 +12,57 @@ $ dune test
 * Write a program using actors
 Let's write a simple programs to calculate the fibonacci numbers.
 
-First, we want a method acting like a function ~fib : int -> int~. To do this, we create the following type:
+First, we want a method acting like a function ~fib : int -> int~. To do this, we create the following module:
 #+begin_src ocaml
-type message = Fib of int
+module MyMessage = struct
+  type 'a t =
+    |  Fib : int -> int t
+  type method_type = { m : 'a . 'a t -> 'a }
+end
+
+module MyActor = Actor.Make(MyMessage)
 #+end_src
 
-Objects of type ~message~ will be sent to the actor. It mean "The actor have a function Fib, which takes an integer"
-
-We cannot (for the moment) specify a return type for the function ~fib~ (see the IDEA below)
+The type 'a t is the type of our message. It represents our different functions. The return type is ~int~, because the type of ~Fib n~ is ~int~.
+We could have define the ~flip~ function by adding the constructor:
+#+begin_src ocam
+    | Flip : ('a -> 'b -> 'c) * 'b * 'a -> 'c t
+#+end_src
 
 Once declared, we can define the ~fib~ function:
 #+begin_src ocaml
-let methods self = function
-  | Fib n ->
+let methods : type a . 'm MyActor.t -> a MyMessage.t -> a = fun self -> function
+  | MyMessage.Fib n ->
     if n < 2 then n else begin
-      let p1 = Actor.send self (Fib (n - 1)) in
-      let p2 = Actor.send self (Fib (n - 2)) in
+      let p1 = MyActor.send self (Fib (n - 1)) in
+      let p2 = MyActor.send self (Fib (n - 2)) in
       Promise.get p1 + Promise.get p2
     end
+
+let actor_methods self = {
+  MyMessage.m = fun s -> methods self s
+}
+#+end_src
+The type annotation is significant, because ~MyMessage.t~ is a GADT, and we want a function of type ~'a . 'a MyMessage.t -> 'a~
+
+Our actor does not need any memory, so we define a trivial ~init~ function:
+#+begin_src ocaml
+let init () = ()
 #+end_src
 
-And we can finally create the actor with ~Actor.create~ (we use () because we do not need any memory):
+And we can finally create the actor with ~MyActor.create~ (we use () because we do not need any memory):
 #+begin_src ocaml
-let actor = Actor.create () methods
+let actor = MyActor.create init actor_methods
 #+end_src
 
 The main function could look like:
 #+begin_src ocaml
 let _ =
-  Actor.run actor;
+  MyActor.run actor;
   let n = 6 in
-  let p = Actor.send actor (Fib n) in
+  let p = MyActor.send actor (Fib n) in
   Printf.printf "fib(%d) = %d\n" n @@ Promise.wait_and_get p
 #+end_src
-
 
 * Explanations
 ** Promises
@@ -88,41 +105,21 @@ In both case, if the value will be returned if it is available
 
 ** Actors
 *** Type
-An actor is (for the moment) only a bunch of functions, a mailbox and a scheduler, it's definition is:
-
+An actor is a  bunch of functions, a shared memory and a scheduler, its definition is:
 #+begin_src ocaml
-type ('m, 's, 'a) t = {
-  (* message and promise to write the result in *)
-  mail_box : ('s * 'a Promise.t) Queue.t;
-  (* mutex for the mailbox *)
-  mail_mutex : Mutex.t;
-  (* list of processes running concurently *)
-  processes : 'a process Queue.t;
-  (* local memory *)
-  memory : 'm;
-  (* different methods of the actor *)
-  (* represented by one unique function because of the sum type *)
-  methods : ('m, 's, 'a) t -> 's -> 'a
+type 'm t = {
+  (* Currently running processes *)
+  processes : process Queue.t;
+  (* Memory shared between methods *)
+  memory : 'm Domain.DLS.key;
+  (* Methods *)
+  methods : 'm t -> S.method_type
 }
 #+end_src
 
-It is parameterized on ~m~, ~s~ and ~a~.
-- ~m~ is the type of the shared memory
-- ~s~ is the type of messages
-- ~a~ is the return type of the methods
+The ~process~ type is a simple ~unit -> unit~, we use a domain local state ~DLS~ to make the memory "Domain local". S is the module containing the method type.
 
-It is not possible at this time to have multiple return types (you can use a sum type if you need it).
-
-**** IDEA Better type for messages
-A better solution would be to consider ~a s~ : a method which returns something of type ~a~. It should be possible with a GADT like so:
-#+begin_src ocaml
-type 'a message =
-  | Fib : int -> int message
-  | Elem : 'a list * 'a -> bool message
-  (* plus other methods... *)
-#+end_src
-
-But I don't know if it's possible to have an higher-kinded type parameter in OCaml. In Haskell I would write an ~Actor~ of kind ~* -> (* -> *) -> *~ where ~(* -> *)~ is the "type" of messages.
+It is parameterized on ~m~, which is the type of the shared memory.
 
 *** Creation
 To create an actor, you only need to specify its methods and its shared memory.
@@ -142,32 +139,38 @@ It will spawn a new thread and run the scheduler.
 open Actorsocaml
 open Promise.Infix
 
-type message =
-  | Fib of int
+module MyMessage = struct
+  type 'a t =
+    | Fib : int -> int Promise.t t
+  type method_type = { m : 'a . 'a t -> 'a }
+end
 
+type memory = int Promise.t Option.t Array.t
 let init () = Array.make 20000 None
 
-let methods self = function
-  | Fib n ->
-    let m = Actor.get_memory self in
+module MyActor = Actor.Make(MyMessage)
+
+let methods : type a . memory MyActor.t -> a MyMessage.t -> a = fun self -> function
+  | MyMessage.Fib n ->
+    let m = MyActor.get_memory self in
     if m.(n) <> None then
       Option.get m.(n)
     else if n < 2 then Promise.pure n else begin
-      let p1 = Promise.join @@ Actor.send self (Fib (n - 1)) in
-      let p2 = Promise.join @@ Actor.send self (Fib (n - 2)) in
+      let p1 = Promise.join @@ MyActor.send self (Fib (n - 1)) in
+      let p2 = Promise.join @@ MyActor.send self (Fib (n - 2)) in
       let pres = (+) <$> p1 <*> p2 in
       m.(n) <- Some pres;
       pres
     end
 
-let actor = Actor.create init methods
+
+let actor_methods self = { MyMessage.m = fun s -> methods self s }
+
+let actor = MyActor.create init actor_methods
 
 let _ =
-  print_endline "-----TEST ACTOR-----";
-  Actor.run actor;
+  MyActor.run actor;
   let n = 42 in
-  let p = Promise.join @@ Actor.send actor (Fib n) in
-  assert (267914296 = Promise.wait_and_get p);
-  print_endline "Test passed";
-  print_endline "--------------------"
+  let p = Promise.join @@ MyActor.send actor (Fib n) in
+  Printf.printf "fib(%d) = %d" n @@ Promise.wait_and_get p;
 #+end_src

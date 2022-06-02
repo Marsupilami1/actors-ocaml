@@ -12,7 +12,7 @@ let init () = Array.make 20000 None
 
 module MyActor = Actor.Make(MyMessage)
 
-let m : type a . memory MyActor.t -> a MyMessage.t -> a = fun self -> function
+let methods : type a . memory MyActor.t -> a MyMessage.t -> a = fun self -> function
   | MyMessage.Fib n ->
     let m = MyActor.get_memory self in
     if m.(n) <> None then
@@ -26,9 +26,11 @@ let m : type a . memory MyActor.t -> a MyMessage.t -> a = fun self -> function
     end
 
 
-let methods self = { MyMessage.m = fun s -> m self s }
+let actor_methods self = {
+  MyMessage.m = fun s -> methods self s
+}
 
-let actor = MyActor.create init methods
+let actor = MyActor.create init actor_methods
 
 let _ =
   print_endline "-----TEST ACTOR-----";

@@ -17,3 +17,8 @@
  (libraries actorsocaml)
  (name test_ring)
  (modules test_ring))
+
+(test
+ (libraries actorsocaml unix)
+ (name test_bench)
+ (modules test_bench))

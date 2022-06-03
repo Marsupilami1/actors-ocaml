@@ -1,5 +1,5 @@
 # Actors-OCaml
-# Compiling the project
+## Compiling the project
 
 You can compile `actors-ocaml` and run the test executable simply by running:
 
@@ -9,7 +9,7 @@ $ dune test
 ```
 
 
-# Write a program using actors
+## Write a program using actors
 
 Let&rsquo;s write a simple programs to calculate the fibonacci numbers.
 
@@ -74,9 +74,9 @@ let _ =
   Printf.printf "fib(%d) = %d\n" n @@ Promise.wait_and_get p
 ```
 
-# Explanations
-## Promises
-### Type
+## Explanations
+### Promises
+#### Type
 
 Promise are boxes where you can write only once, so something like
 
@@ -106,13 +106,13 @@ type 'a status =
 As you can see, the hook takes a function `'a -> unit`, so it will receive the value of the future in argument.
 This is useful to define functions such as `fmap` and `join` (See `Promise.Infix`).
 
-### Creating and writing
+#### Creating and writing
 
 You can create a promise with the `create` function, and fill it with `fill`.
 
 Trying to fill in the same promise twice raises a `Promise__Multiple_Write` error.
 
-### Reading
+#### Reading
 
 You have two ways to read the value from a promise:
 
@@ -122,8 +122,8 @@ You have two ways to read the value from a promise:
 In both case, if the value will be returned if it is available
 
 
-## Actors
-### Type
+### Actors
+#### Type
 
 An actor is a  bunch of functions, a shared memory and a scheduler, its definition is:
 
@@ -142,7 +142,7 @@ The `process` type is a simple `unit -> unit`, we use a domain local state `DLS`
 
 It is parameterized on `'m`, which is the type of the shared memory.
 
-### Creation
+#### Creation
 
 To create an actor, you only need to specify its methods and its shared memory.
 A method is a function which takes an actor (`self`) and a message.
@@ -151,10 +151,10 @@ Do not use `Promise.wait_and_get` on a promise obtained by self, you'll get stuc
 Maybe this will be ensured by the type system in the future.
 In general, you don't need to use `Promise.get`, `pure` and `bind` should be general enough for your code.
 
-### Execution
+#### Execution
 
 To run an actor, just call the `run` function on it.
 It will spawn a new thread and run the scheduler.
 
-# Exemples
+## Exemples
 See `test/test_{actor; pingpong; ring}.ml`

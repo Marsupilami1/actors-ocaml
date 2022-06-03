@@ -6,5 +6,7 @@ module Make (S : Message.S) : sig
   val get_memory : 'm t -> 'm
   val set_memory : 'm t -> 'm -> unit
 
-  val run : 'm t -> unit
+  type running
+  val run : 'm t -> running
+  val stop : 'm t -> running -> unit
 end

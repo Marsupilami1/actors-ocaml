@@ -2,6 +2,8 @@
 module Make(S : Message.S) = struct
   open Effect.Deep
 
+  exception Stop
+
   type process = (unit -> unit)
 
   (* Type of Actors, 'm is the type of memory *)
@@ -53,7 +55,13 @@ module Make(S : Message.S) = struct
         | _ -> None
     }
 
-  let run self = ignore @@ Domain.spawn (fun _ ->
+  type running = unit Domain.t
+  let run self = Domain.spawn (fun _ ->
       loop self
     )
+
+  let stop self r =
+    push_process self (fun _ -> raise Stop);
+    try Domain.join r with
+    | Stop -> ()
 end

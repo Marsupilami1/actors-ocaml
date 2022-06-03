@@ -34,9 +34,12 @@ let actor = MyActor.create init actor_methods
 
 let _ =
   print_endline "-----TEST ACTOR-----";
-  MyActor.run actor;
+  let ra = MyActor.run actor in
+
   let n = 42 in
   let p = Promise.join @@ MyActor.send actor (Fib n) in
   assert (267914296 = Promise.wait_and_get p);
+
+  MyActor.stop actor ra;
   print_endline "Test passed";
   print_endline "--------------------"

@@ -19,7 +19,9 @@ and Ping : sig
   type 'm t
   val create : (unit -> 'm) -> ('m t -> MessagePing.method_type) -> 'm t
   val send : 'm t -> 'a MessagePing.t -> 'a Promise.t
-  val run : 'm t -> unit
+  type running
+  val run : 'm t -> running
+  val stop : 'm t -> running -> unit
 end = Actor.Make(MessagePing)
 
 and MessagePong : sig
@@ -33,7 +35,9 @@ and Pong : sig
   type 'm t
   val create : (unit -> 'm) -> ('m t -> MessagePong.method_type) -> 'm t
   val send : 'm t -> 'a MessagePong.t -> 'a Promise.t
-  val run : 'm t -> unit
+  type running
+  val run : 'm t -> running
+  val stop : 'm t -> running -> unit
 end = Actor.Make(MessagePong)
 
 
@@ -66,10 +70,13 @@ let _ =
 
   let ping = Ping.create init actor_ping_methods in
   let pong = Pong.create init actor_pong_methods in
-  Ping.run ping;
-  Pong.run pong;
+  let rping = Ping.run ping in
+  let rpong = Pong.run pong in
 
   let p = Ping.send ping (Ping(pong, 10)) in
   Promise.wait_and_get p;
+
+  Ping.stop ping rping;
+  Pong.stop pong rpong;
 
   print_endline "------------------------"

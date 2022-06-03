@@ -61,11 +61,11 @@ let leader = RingMember.create init actor_ring_methods
 let _ =
   print_endline "-----TEST RING------";
   RingMember.run leader;
-  let p = RingMember.send leader (CreateRing(1, 4, leader)) in
+  let p = RingMember.send leader (CreateRing(1, 100, leader)) in
   Promise.wait_and_get p;
   print_endline "Ring created";
 
-  let p' = RingMember.send leader (Send(100)) in
+  let p' = RingMember.send leader (Send(10_000)) in
   Promise.wait_and_get p';
   print_endline "Test passed";
   print_endline "--------------------";

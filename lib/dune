@@ -1,4 +1,5 @@
 (library
+ (libraries domainslib)
  (name actorsocaml)
  (public_name actorsocaml))
  ;;(modules actor promise))

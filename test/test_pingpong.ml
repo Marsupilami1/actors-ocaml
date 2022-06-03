@@ -54,17 +54,18 @@ let pong_methods
     | Pong(ping, n) ->
       Printf.printf "Pong: %d\n%!" n;
       if n > 0 then
-        Promise.get @@ Ping.send ping (Ping(self, n-1))
+        Promise.get @@ Ping.send ping (Ping(self, n - 1))
 let actor_pong_methods self = {
   MessagePong.m = fun s -> pong_methods self s
 }
 
 
-let ping = Ping.create init actor_ping_methods
-let pong = Pong.create init actor_pong_methods
 
 let _ =
   print_endline "-----TEST PINGPONG------";
+
+  let ping = Ping.create init actor_ping_methods in
+  let pong = Pong.create init actor_pong_methods in
   Ping.run ping;
   Pong.run pong;
 

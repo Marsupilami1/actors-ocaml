@@ -27,5 +27,5 @@ let _ =
   let message = MyMessage.Pass () in
   MyActor.run actor;
   ignore @@ MyActor.send actor message;
-  Unix.sleep 5;
-  print_endline "-------------------"
+  Unix.sleep 1;
+  print_endline "--------------------"

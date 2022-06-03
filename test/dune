@@ -9,6 +9,11 @@
  (modules test_promise))
 
 (test
- (libraries actorsocaml unix)
+ (libraries actorsocaml)
  (name test_pingpong)
  (modules test_pingpong))
+
+(test
+ (libraries actorsocaml)
+ (name test_ring)
+ (modules test_ring))

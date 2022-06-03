@@ -129,7 +129,7 @@ An actor is a  bunch of functions, a shared memory and a scheduler, its definiti
 ``` ocaml
 type 'm t = {
   (* Currently running processes *)
-  processes : process Queue.t;
+  processes : process Domainslib.Chan.t;
   (* Memory shared between methods *)
   memory : 'm Domain.DLS.key;
   (* Methods *)
@@ -198,4 +198,7 @@ let _ =
 ```
 
 ## PING PONG
+See `test/test_pingpong.ml`
+
+## Ring
 See `test/test_pingpong.ml`

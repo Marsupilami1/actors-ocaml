@@ -41,7 +41,7 @@ let methods : type a . 'm MyActor.t -> a MyMessage.t -> a = fun self -> function
     if n < 2 then n else begin
       let p1 = MyActor.send self (Fib (n - 1)) in
       let p2 = MyActor.send self (Fib (n - 2)) in
-      Promise.get p1 + Promise.get p2
+      Promise.await p1 + Promise.await p2
     end
 
 let actor_methods self = {
@@ -71,7 +71,7 @@ let _ =
   let n = 6 in
   let p = MyActor.send actor (Fib n) in
   MyActor.Stop actor running_actor;
-  Printf.printf "fib(%d) = %d\n" n @@ Promise.wait_and_get p
+  Printf.printf "fib(%d) = %d\n" n @@ Promise.get p
 ```
 
 ## Explanations
@@ -116,8 +116,8 @@ Trying to fill in the same promise twice raises a `Promise__Multiple_Write` erro
 
 You have two ways to read the value from a promise:
 
--   `wait_and_get` is blocking, so you can use it if someone else is doing the computation in *parallel*
--   `get` will throw the effect `NotReady p` if the value is not available. It can then be handled by a scheduler to compute the value *concurently*.
+-   `get` is blocking, so you can use it if someone else is doing the computation in *parallel*
+-   `await` will throw the effect `NotReady p` if the value is not available. It can then be handled by a scheduler to compute the value *concurently*.
 
 In both case, if the value will be returned if it is available
 
@@ -147,9 +147,9 @@ It is parameterized on `'m`, which is the type of the shared memory.
 To create an actor, you only need to specify its methods and its shared memory.
 A method is a function which takes an actor (`self`) and a message.
 
-Do not use `Promise.wait_and_get` on a promise obtained by self, you'll get stuck on a value that will never be calculated.
+Do not use `Promise.get` on a promise obtained by self, you'll get stuck on a value that will never be calculated.
 Maybe this will be ensured by the type system in the future.
-In general, you don't need to use `Promise.get`, `pure` and `bind` should be general enough for your code.
+In general, you don't need to use `Promise.await`, `pure` and `bind` should be general enough for your code.
 
 #### Execution
 

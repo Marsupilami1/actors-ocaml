@@ -47,7 +47,7 @@ let ping_methods
     | Ping(pong, n) ->
       Printf.printf "Ping: %d\n%!" n;
       if n > 0 then
-        Promise.get @@ Pong.send pong (Pong(self, n - 1))
+        Promise.await @@ Pong.send pong (Pong(self, n - 1))
 let actor_ping_methods self = {
   MessagePing.m = fun s -> ping_methods self s
 }
@@ -58,7 +58,7 @@ let pong_methods
     | Pong(ping, n) ->
       Printf.printf "Pong: %d\n%!" n;
       if n > 0 then
-        Promise.get @@ Ping.send ping (Ping(self, n - 1))
+        Promise.await @@ Ping.send ping (Ping(self, n - 1))
 let actor_pong_methods self = {
   MessagePong.m = fun s -> pong_methods self s
 }
@@ -74,7 +74,7 @@ let _ =
   let rpong = Pong.run pong in
 
   let p = Ping.send ping (Ping(pong, 10)) in
-  Promise.wait_and_get p;
+  Promise.get p;
 
   Ping.stop ping rping;
   Pong.stop pong rpong;

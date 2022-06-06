@@ -47,7 +47,7 @@ let rec ring_methods
         let m = RingMember.get_memory self in
         match m.next with
         | None -> print_endline "abort"
-        | Some next -> Promise.get @@ RingMember.send next (Send(n-1))
+        | Some next -> Promise.await @@ RingMember.send next (Send(n-1))
       end
     | CreateRing(id, size, leader) ->
       let m = RingMember.get_memory self in
@@ -60,13 +60,13 @@ let rec ring_methods
         m.next <- Some next;
         m.rn <- Some rn;
         RingMember.set_memory self m;
-        Promise.get @@ RingMember.send next (CreateRing(id+1, size, leader))
+        Promise.await @@ RingMember.send next (CreateRing(id+1, size, leader))
       end
     | Stop(leader) ->
       let m = RingMember.get_memory self in
       let next = Option.get m.next in
       if next != leader then begin
-        Promise.get @@ RingMember.send next (Stop(leader));
+        Promise.await @@ RingMember.send next (Stop(leader));
         RingMember.stop next (Option.get m.rn)
       end
 
@@ -82,15 +82,15 @@ let _ =
   print_endline "-----TEST RING------";
   let rl = RingMember.run leader in
   let p = RingMember.send leader (CreateRing(1, 100, leader)) in
-  Promise.wait_and_get p;
+  Promise.get p;
   print_endline "Creation: Done";
 
   let p' = RingMember.send leader (Send(10000)) in
-  Promise.wait_and_get p';
+  Promise.get p';
   print_endline "Cycle: Done";
 
   let p'' = RingMember.send leader (Stop(leader)) in
-  Promise.wait_and_get p'';
+  Promise.get p'';
   RingMember.stop leader rl;
   print_endline "Stop: Done";
 

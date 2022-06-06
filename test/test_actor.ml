@@ -38,7 +38,7 @@ let _ =
 
   let n = 42 in
   let p = Promise.join @@ MyActor.send actor (Fib n) in
-  assert (267914296 = Promise.wait_and_get p);
+  assert (267914296 = Promise.get p);
 
   MyActor.stop actor ra;
   print_endline "Test passed";

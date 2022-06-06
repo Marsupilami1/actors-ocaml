@@ -15,15 +15,15 @@ let create () = ref @@ Empty []
 
 type _ Effect.t += NotReady : 'a t -> 'a Effect.t
 
-(* get is blocking *)
-let get p =
+let await p =
   match !p with
   | Empty _ -> perform @@ NotReady p
   | Filled v -> v
 
-let rec wait_and_get p =
+(* get is blocking *)
+let rec get p =
   match !p with
-  | Empty _ -> Domain.cpu_relax (); wait_and_get p
+  | Empty _ -> Domain.cpu_relax (); get p
   | Filled v -> v
 
 exception Future__Multiple_Write

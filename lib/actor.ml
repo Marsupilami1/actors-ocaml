@@ -1,5 +1,6 @@
 (* Module Actor *)
 module Make(S : Message.S) = struct
+  open Effect
   open Effect.Deep
 
   exception Stop
@@ -37,6 +38,11 @@ module Make(S : Message.S) = struct
   let manage_next_process self =
     get_process self ()
 
+  type _ Effect.t += WaitFor : (unit -> bool) -> unit Effect.t
+
+  let wait_for condition =
+    perform @@ WaitFor condition
+
   let rec loop self =
     match_with manage_next_process self {
       retc = (fun _ -> loop self);
@@ -51,6 +57,15 @@ module Make(S : Message.S) = struct
               Promise.add_hook p (fun v ->
                   push_process self (fun _ -> continue k v));
               loop self;
+          )
+        | WaitFor condition -> Some (
+            fun (k : (a, _) continuation) ->
+              if condition () then
+                continue k ()
+              else (
+                push_process self (fun _ -> wait_for condition; continue k ());
+                loop self
+              )
           )
         | _ -> None
     }

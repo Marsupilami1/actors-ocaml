@@ -5,6 +5,7 @@ module Make (S : Message.S) : sig
   val send : 'm t -> 'a S.t -> 'a Promise.t
   val get_memory : 'm t -> 'm
   val set_memory : 'm t -> 'm -> unit
+  val wait_for : (unit -> bool) -> unit
 
   type running
   val run : 'm t -> running

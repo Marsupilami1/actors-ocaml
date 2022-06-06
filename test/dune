@@ -22,3 +22,8 @@
  (libraries actorsocaml unix)
  (name test_bench)
  (modules test_bench))
+
+(test
+ (libraries actorsocaml)
+ (name test_condition)
+ (modules test_condition))

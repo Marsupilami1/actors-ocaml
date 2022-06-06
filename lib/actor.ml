@@ -52,9 +52,9 @@ module Make(S : Message.S) = struct
         | Promise.NotReady p -> Some (
             fun (k : (a, _) continuation) ->
               (* The process is waiting for the promise to be filled *)
-              (* So we add a hook to this promise to push the process *)
+              (* So we add a callback to this promise to push the process *)
               (* back to the queue *)
-              Promise.add_hook p (fun v ->
+              Promise.add_callback p (fun v ->
                   push_process self (fun _ -> continue k v));
               loop self;
           )

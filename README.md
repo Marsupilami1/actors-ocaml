@@ -92,8 +92,8 @@ type 'a t = 'a status ref
 ```
 
 This type is fine for simple programs, but waiting processes have no way to know when the promise is filled.
-So we add a list of hooks to the empty future. These hooks will be executed when the promise it filled.
-Thanks to this, the scheduler can add a hook to a promise to put a waiting process back in the queue (Faster than pushing the process to the queue directly and reading the empty promise again).
+So we add a list of callbacks to the empty future. These callbacks will be executed when the promise it filled.
+Thanks to this, the scheduler can add a callback to a promise to put a waiting process back in the queue (Faster than pushing the process to the queue directly and reading the empty promise again).
 
 The real `status` type is:
 
@@ -103,7 +103,7 @@ type 'a status =
    | Filled of 'a
 ```
 
-As you can see, the hook takes a function `'a -> unit`, so it will receive the value of the future in argument.
+As you can see, the callback takes a function `'a -> unit`, so it will receive the value of the future in argument.
 This is useful to define functions such as `fmap` and `join` (See `Promise.Infix`).
 
 #### Creating and writing

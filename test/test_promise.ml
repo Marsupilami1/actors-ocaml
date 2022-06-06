@@ -24,7 +24,7 @@ let test3 () =
 
 let test4 () =
   let p = Promise.create () in
-  Promise.add_hook p (fun v -> assert (v == 42));
+  Promise.add_callback p (fun v -> assert (v == 42));
   Promise.fill p 42;
   print_endline "Test 4 : Passed"
 

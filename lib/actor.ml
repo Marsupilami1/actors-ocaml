@@ -29,11 +29,13 @@ module Make(S : Message.S) = struct
   let get_process self =
     Domainslib.Chan.recv self.processes
 
-  let send self message =
+  let async self f =
     let p = Promise.create () in
-    push_process self (fun () ->
-        Promise.fill p (((self.methods self).m) message));
+    push_process self (fun _ -> Promise.fill p (f ()));
     p
+
+  let send self message =
+    async self (fun () -> ((self.methods self).m) message)
 
   let manage_next_process self =
     get_process self ()

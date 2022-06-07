@@ -37,6 +37,15 @@ let test5 () =
   assert (42 = Promise.get k);
   print_endline "Test 5 : Passed"
 
+let test6 () =
+  let p = Promise.create () in
+  let q = Promise.create () in
+  Promise.add_callback q (fun v -> assert (v = 42));
+  Promise.replace q p;
+  Promise.fill p 42;
+  assert (Promise.get p = 42);
+  assert (Promise.get q = 42);
+  print_endline "Test 6 : Passed"
 
 
 let _ =
@@ -46,4 +55,5 @@ let _ =
   test3 ();
   test4 ();
   test5 ();
+  test6 ();
   print_endline "----------------------"

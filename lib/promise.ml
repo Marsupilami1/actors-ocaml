@@ -9,35 +9,41 @@ type 'a status =
   | Empty of ('a -> unit) list
   | Filled of 'a
 
-type 'a t = 'a status ref
+(* Promise is a status ref ref, this allows futures' replacement: *)
+(* P1 ---> sr ---> s *)
+(* P2 ---> sr ---> s *)
+(* replace P2 by P1 gives: *)
+(* P1 ---> sr ---> s *)
+(* P2 -----^         *)
+type 'a t = 'a status ref ref
 
-let create () = ref @@ Empty []
+let create () = ref @@ ref @@ Empty []
 
 type _ Effect.t += NotReady : 'a t -> 'a Effect.t
 
 let await p =
-  match !p with
+  match !(!p) with
   | Empty _ -> perform @@ NotReady p
   | Filled v -> v
 
 (* get is blocking *)
 let rec get p =
-  match !p with
+  match !(!p) with
   | Empty _ -> Domain.cpu_relax (); get p
   | Filled v -> v
 
 exception Future__Multiple_Write
 
 let fill p v =
-  match !p with
+  match !(!p) with
   | Empty l ->
     (* run all callbacks *)
     List.iter (fun f -> f v) l;
-    p := Filled v;
+    !p := Filled v;
   | Filled _ -> raise Future__Multiple_Write
 
 let is_ready p =
-  match !p with
+  match !(!p) with
   | Empty _ -> false
   | Filled _ -> true
 
@@ -47,16 +53,23 @@ let is_ready p =
 (* it will be executed by the promise filler, which can run in *)
 (* another thread. *)
 let add_callback p f =
-  match !p with
-  | Empty l -> p := Empty(f :: l)
+  match !(!p) with
+  | Empty l -> !p := Empty(f :: l)
   | Filled v -> f v
+
+let replace p p' =
+  match !(!p) with
+  | Empty l ->
+    p := !p';
+    add_callback p' (fun v -> List.iter (fun f -> f v) l);
+  |Filled _ -> raise Future__Multiple_Write
 
 let fmap f p =
   let p' = create () in
   add_callback p (fun v -> fill p' (f v));
   p'
 
-let pure v = ref (Filled v)
+let pure v = ref @@ ref (Filled v)
 
 let join pp =
   let res = create () in

@@ -9,6 +9,7 @@ val is_ready : 'a t -> bool
 
 val add_callback : 'a t -> ('a -> unit) -> unit
 
+val replace : 'a t -> 'a t -> unit
 val fmap : ('a -> 'b) -> 'a t -> 'b t
 val pure : 'a -> 'a t
 val join : 'a t t -> 'a t

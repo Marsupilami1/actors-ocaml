@@ -77,6 +77,7 @@ let _ =
   Promise.get p;
 
   Ping.stop ping rping;
+  Unix.sleep 2;
   Pong.stop pong rpong;
 
   print_endline "------------------------"

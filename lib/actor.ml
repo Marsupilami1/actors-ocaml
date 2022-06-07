@@ -48,7 +48,9 @@ module Make(S : Message.S) = struct
   let rec loop self =
     match_with manage_next_process self {
       retc = (fun _ -> loop self);
-      exnc = raise;
+      exnc = (fun e -> match e with
+          | _ -> raise e
+        );
       effc = fun (type a) (e : a Effect.t) ->
         match e with
         | Promise.NotReady p -> Some (
@@ -65,7 +67,8 @@ module Make(S : Message.S) = struct
               if condition () then
                 continue k ()
               else (
-                push_process self (fun _ -> wait_for condition; continue k ());
+                push_process self (fun _ ->
+                    wait_for condition; continue k ());
                 loop self
               )
           )
@@ -79,6 +82,6 @@ module Make(S : Message.S) = struct
 
   let stop self r =
     push_process self (fun _ -> raise Stop);
-    try Domain.join r with
-    | Stop -> ()
+    (try Domain.join r with
+    | Stop -> () );
 end

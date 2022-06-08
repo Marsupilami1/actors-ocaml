@@ -16,8 +16,9 @@ exception Promise__Multiple_Write
 
 (** {1 Creation and access} *)
 
-(** [create ()] creates an empty promise. *)
-val create : unit -> 'a t
+(** [create ()] creates an empty promise, it returns the
+    promise and a [fill] function *)
+val create : unit -> 'a t * ('a -> unit)
 
 (** [pure v] creates a promise with the value [v]
     directly available. *)
@@ -33,11 +34,6 @@ val get : 'a t -> 'a
 
 (** [is_ready p] checks if the value of [p] is available. *)
 val is_ready : 'a t -> bool
-
-(** [fill p v] puts the value [v] int the promise [p].
-    It raises the exception {!Promise__Multiple_Write}
-    if [p] is already fulfilled. *)
-val fill : 'a t -> 'a -> unit
 
 (** [add_callback p f] will add the callback [f] to the
     promise [p]. When [p] will be fulfilled with a value

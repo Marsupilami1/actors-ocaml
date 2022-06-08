@@ -37,7 +37,7 @@ let rec fill p v =
 
 let create () =
   let p = Atomic.make @@ Empty [] in
-  p
+  (p, fill p)
 
 type _ Effect.t += NotReady : 'a t -> 'a Effect.t
 
@@ -101,30 +101,30 @@ let unify p p' =
   unify_leaders p p'
 
 let fmap f p =
-  let p' = create () in
-  add_callback p (fun v -> fill p' (f v));
+  let (p', fill) = create () in
+  add_callback p (fun v -> fill (f v));
   p'
 
 let pure v = Atomic.make (Filled v)
 
 let join pp =
-  let res = create () in
-  add_callback pp (fun p -> add_callback p (fun v -> fill res v));
+  let (res, fill) = create () in
+  add_callback pp (fun p -> add_callback p (fun v -> fill v));
   res
 
 let bind m f =
-  let p = create () in
-  add_callback m (fun v -> fill p (f v));
+  let (p, fill) = create () in
+  add_callback m (fun v -> fill (f v));
   join p
 
 
 module Infix = struct
   let (<$>) = fmap
   let (<*>) pf px =
-    let p = create () in
+    let (p, fill) = create () in
     add_callback pf (
       fun f -> add_callback px (
-          fun x -> fill p (f x)
+          fun x -> fill (f x)
         )
     );
     p

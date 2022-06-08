@@ -19,15 +19,15 @@ module Make(S : Scheduler.S)(M : Message.S) = struct
   let set_memory self memory = Domain.DLS.set self.memory memory
 
   let async self f =
-    let p = Promise.create () in
-    S.push_process self.scheduler (fun _ -> Promise.fill p (f ()));
+    let (p, fill) = Promise.create () in
+    S.push_process self.scheduler (fun _ -> fill (f ()));
     p
 
   let send self message =
-    let p = Promise.create () in
+    let (p, fill) = Promise.create () in
     let forward p' = Promise.unify p p'; raise S.Interrupt in
     S.push_process self.scheduler (fun _ ->
-        Promise.fill p (((self.methods self).m) forward message));
+        fill (((self.methods self).m) forward message));
     p
 
   let wait_for condition =

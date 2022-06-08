@@ -23,26 +23,26 @@ let test3 () =
   print_endline "Test 3 : Passed"
 
 let test4 () =
-  let p = Promise.create () in
+  let (p, fill) = Promise.create () in
   Promise.add_callback p (fun v -> assert (v == 42));
-  Promise.fill p 42;
+  fill 42;
   print_endline "Test 4 : Passed"
 
 let test5 () =
-  let p = Promise.create () in
-  let q = Promise.create () in
+  let (p, fillp) = Promise.create () in
+  let (q, fillq) = Promise.create () in
   let k = Promise.join p in
-  Promise.fill p q;
-  Promise.fill q 42;
+  fillp q;
+  fillq 42;
   assert (42 = Promise.get k);
   print_endline "Test 5 : Passed"
 
 let test6 () =
-  let p = Promise.create () in
-  let q = Promise.create () in
+  let (p, fillp) = Promise.create () in
+  let (q, _) = Promise.create () in
   Promise.add_callback q (fun v -> assert (v = 42));
   Promise.unify q p;
-  Promise.fill p 42;
+  fillp 42;
   assert (Promise.get p = 42);
   assert (Promise.get q = 42);
   print_endline "Test 6 : Passed"

@@ -3,15 +3,18 @@ open Actorsocaml
 
 module MyMessage = struct
   type 'a t = Pass : unit -> unit t
-  type method_type = { m : 'a . 'a t -> 'a }
+  type method_type = { m : 'a . ('a Promise.t -> 'a) -> 'a t -> 'a }
 end
 
 module MyActor = Actor.Make(MyMessage)
 
 
-let methods :
-  type a . 'm MyActor.t -> a MyMessage.t -> a =
-  fun _ -> function
+let methods
+  : type a . 'm MyActor.t
+    -> (a Promise.t -> a)
+    -> a MyMessage.t
+    -> a =
+  fun _ _ -> function
     | Pass () -> ()
 let actor_methods self = {
   MyMessage.m = fun s -> methods self s
@@ -29,4 +32,5 @@ let _ =
   ignore @@ MyActor.send actor message;
   Unix.sleep 1;
   MyActor.stop actor ra;
+  print_endline "Test passed";
   print_endline "--------------------"

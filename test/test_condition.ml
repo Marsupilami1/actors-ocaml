@@ -4,7 +4,7 @@ module MyMessage = struct
   type 'a t =
     | Set : int -> unit t
     | Wait : unit t
-  type method_type = { m : 'a . 'a t -> 'a }
+  type method_type = { m : 'a . ('a Promise.t -> 'a) -> 'a t -> 'a }
 end
 
 type memory = int
@@ -12,7 +12,12 @@ let init () = 0
 
 module MyActor = Actor.Make(MyMessage)
 
-let methods : type a . memory MyActor.t -> a MyMessage.t -> a = fun self -> function
+let methods
+  : type a . memory MyActor.t
+    -> (a Promise.t -> a)
+    -> a MyMessage.t
+    -> a
+  = fun self _ -> function
   | Set n ->
     Printf.printf "Set n to %d\n%!" n;
     MyActor.set_memory self n

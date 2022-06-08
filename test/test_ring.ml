@@ -12,7 +12,7 @@ module rec MessageRing : sig
     | Send : int -> unit t
     | Stop : memory RingMember.t -> unit t
     | CreateRing : int * int * memory RingMember.t -> unit t
-  type method_type = { m : 'a . 'a t -> 'a }
+  type method_type = { m : 'a . ('a Promise.t -> 'a) -> 'a t -> 'a }
 end
 = struct
   type memory = {
@@ -23,7 +23,7 @@ end
     | Send : int -> unit t
     | Stop : memory RingMember.t -> unit t
     | CreateRing : int * int * memory RingMember.t -> unit t
-  type method_type = { m : 'a . 'a t -> 'a }
+  type method_type = { m : 'a . ('a Promise.t -> 'a) -> 'a t -> 'a }
 end
 and RingMember : sig
   type 'm t
@@ -39,15 +39,18 @@ end = Actor.Make(MessageRing)
 let init = fun _ -> { MessageRing.next = None; MessageRing.rn = None }
 
 let rec ring_methods
-  : type a . MessageRing.memory RingMember.t -> a MessageRing.t -> a =
-  fun self -> function
+  : type a . MessageRing.memory RingMember.t
+    -> (a Promise.t -> a)
+    -> a MessageRing.t
+    -> a
+  = fun self forward -> function
     | Send(n) ->
       if n < 0 then () else begin
         (* Printf.printf "%d\n%!" n; *)
         let m = RingMember.get_memory self in
         match m.next with
         | None -> print_endline "abort"
-        | Some next -> Promise.await @@ RingMember.send next (Send(n-1))
+        | Some next -> forward @@ RingMember.send next (Send(n-1))
       end
     | CreateRing(id, size, leader) ->
       let m = RingMember.get_memory self in
@@ -60,13 +63,13 @@ let rec ring_methods
         m.next <- Some next;
         m.rn <- Some rn;
         RingMember.set_memory self m;
-        Promise.await @@ RingMember.send next (CreateRing(id+1, size, leader))
+        forward @@ RingMember.send next (CreateRing(id+1, size, leader))
       end
     | Stop(leader) ->
       let m = RingMember.get_memory self in
       let next = Option.get m.next in
       if next != leader then begin
-        Promise.await @@ RingMember.send next (Stop(leader));
+        forward @@ RingMember.send next (Stop(leader));
         RingMember.stop next (Option.get m.rn)
       end
 
@@ -85,7 +88,7 @@ let _ =
   Promise.get p;
   print_endline "Creation: Done";
 
-  let p' = RingMember.send leader (Send(10000)) in
+  let p' = RingMember.send leader (Send(1_000_000)) in
   Promise.get p';
   print_endline "Cycle: Done";
 

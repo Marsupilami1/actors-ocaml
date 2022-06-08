@@ -41,7 +41,7 @@ let test6 () =
   let p = Promise.create () in
   let q = Promise.create () in
   Promise.add_callback q (fun v -> assert (v = 42));
-  Promise.replace q p;
+  Promise.unify q p;
   Promise.fill p 42;
   assert (Promise.get p = 42);
   assert (Promise.get q = 42);

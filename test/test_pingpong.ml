@@ -8,12 +8,12 @@ let init = Fun.id
 module rec MessagePing : sig
   type 'a t =
     | Ping : memory Pong.t * int -> unit t
-  type method_type = { m : 'a . 'a t -> 'a }
+  type method_type = { m : 'a . ('a Promise.t -> 'a) -> 'a t -> 'a }
 end
 = struct
   type 'a t =
     | Ping : memory Pong.t * int -> unit t
-  type method_type = { m : 'a . 'a t -> 'a }
+  type method_type = { m : 'a . ('a Promise.t -> 'a) -> 'a t -> 'a }
 end
 and Ping : sig
   type 'm t
@@ -26,10 +26,10 @@ end = Actor.Make(MessagePing)
 
 and MessagePong : sig
   type 'a t = Pong : memory Ping.t * int -> unit t
-  type method_type = { m : 'a . 'a t -> 'a }
+  type method_type = { m : 'a . ('a Promise.t -> 'a) -> 'a t -> 'a }
 end = struct
   type 'a t = Pong : memory Ping.t * int -> unit t
-  type method_type = { m : 'a . 'a t -> 'a }
+  type method_type = { m : 'a . ('a Promise.t -> 'a) -> 'a t -> 'a }
 end
 and Pong : sig
   type 'm t
@@ -42,23 +42,29 @@ end = Actor.Make(MessagePong)
 
 
 let ping_methods
-  : type a . memory Ping.t -> a MessagePing.t -> a =
-  fun self -> function
+  : type a . memory Ping.t
+    -> (a Promise.t -> a)
+    -> a MessagePing.t
+    -> a
+  = fun self forward -> function
     | Ping(pong, n) ->
-      Printf.printf "Ping: %d\n%!" n;
+      (* Printf.printf "Ping: %d\n%!" n; *)
       if n > 0 then
-        Promise.await @@ Pong.send pong (Pong(self, n - 1))
+        forward @@ Pong.send pong (Pong(self, n - 1))
 let actor_ping_methods self = {
   MessagePing.m = fun s -> ping_methods self s
 }
 
 let pong_methods
-  : type a . memory Pong.t -> a MessagePong.t -> a =
-  fun self -> function
+  : type a . memory Pong.t
+    -> (a Promise.t -> a)
+    -> a MessagePong.t
+    -> a
+  = fun self forward -> function
     | Pong(ping, n) ->
-      Printf.printf "Pong: %d\n%!" n;
+      (* Printf.printf "Pong: %d\n%!" n; *)
       if n > 0 then
-        Promise.await @@ Ping.send ping (Ping(self, n - 1))
+        forward @@ Ping.send ping (Ping(self, n - 1))
 let actor_pong_methods self = {
   MessagePong.m = fun s -> pong_methods self s
 }
@@ -73,11 +79,12 @@ let _ =
   let rping = Ping.run ping in
   let rpong = Pong.run pong in
 
-  let p = Ping.send ping (Ping(pong, 10)) in
+  (* TODO: solve deadlock issue *)
+  let n = 1_000 in
+  let p = Ping.send ping (Ping(pong, n)) in
   Promise.get p;
 
   Ping.stop ping rping;
-  Unix.sleep 2;
   Pong.stop pong rpong;
 
   print_endline "------------------------"

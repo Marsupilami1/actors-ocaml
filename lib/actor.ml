@@ -4,6 +4,7 @@ module Make(S : Message.S) = struct
   open Effect.Deep
 
   exception Stop
+  exception Interrupt
 
   type process = (unit -> unit)
 
@@ -35,7 +36,11 @@ module Make(S : Message.S) = struct
     p
 
   let send self message =
-    async self (fun () -> ((self.methods self).m) message)
+    let p = Promise.create () in
+    let forward p' = Promise.unify p p'; raise Interrupt in
+    push_process self (fun _ ->
+        Promise.fill p (((self.methods self).m) forward message));
+    p
 
   let manage_next_process self =
     get_process self ()
@@ -49,6 +54,7 @@ module Make(S : Message.S) = struct
     match_with manage_next_process self {
       retc = (fun _ -> loop self);
       exnc = (fun e -> match e with
+          | Interrupt -> (* print_endline "interrupt"; *) loop self
           | _ -> raise e
         );
       effc = fun (type a) (e : a Effect.t) ->

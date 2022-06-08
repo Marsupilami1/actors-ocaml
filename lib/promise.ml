@@ -11,20 +11,36 @@ type 'a status =
   | Forwarded of 'a t Atomic.t
 and 'a t = 'a status Atomic.t
 
-let create () = Atomic.make @@ Empty []
-
-type _ Effect.t += NotReady : 'a t -> 'a Effect.t
-
 let rec find_leader p =
   let x = Atomic.get p in
   match Atomic.get x with
   | Forwarded p' ->
     let leader = find_leader p' in
-    leader
-    (* if Atomic.compare_and_set p x (leader) *)
-    (* then leader *)
-    (* else find_leader p *)
+    if Atomic.compare_and_set p x (leader)
+    then leader
+    else find_leader p
   | _ -> x
+
+let apply_callbacks l v =
+  List.iter (fun f -> f v) l
+
+exception Promise__Multiple_Write
+
+let rec fill p v =
+  match Atomic.get p with
+  | Empty l as x ->
+    if Atomic.compare_and_set p x (Filled v) then
+      apply_callbacks l v
+    else fill p v;
+  | Filled _ -> raise Promise__Multiple_Write
+  | Forwarded p' -> fill (find_leader p') v
+
+let create () =
+  let p = Atomic.make @@ Empty [] in
+  p
+
+type _ Effect.t += NotReady : 'a t -> 'a Effect.t
+
 
 let rec await p =
   match Atomic.get p with
@@ -39,19 +55,8 @@ let rec get p =
   | Filled v -> v
   | Forwarded p' -> get (find_leader p')
 
-exception Promise__Multiple_Write
 
-let apply_callbacks l v =
-  List.iter (fun f -> f v) l
 
-let rec fill p v =
-  match Atomic.get p with
-  | Empty l as x ->
-    if Atomic.compare_and_set p x (Filled v) then
-      apply_callbacks l v
-    else fill p v;
-  | Filled _ -> raise Promise__Multiple_Write
-  | Forwarded p' -> fill (find_leader p') v
 
 let rec is_ready p =
   match Atomic.get p with

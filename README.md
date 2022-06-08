@@ -24,7 +24,8 @@ module MyMessage = struct
   type method_type = { m : 'a . ('a Promise.t -> 'a) -> 'a t -> 'a }
 end
 
-module MyActor = Actor.Make(MyMessage)
+(* Roundrobin is a predefined scheduler *)
+module MyActor = Actor.Make(Roundrobin)(MyMessage)
 ```
 
 
@@ -74,11 +75,11 @@ The main function could look like:
 
 ``` ocaml
 let _ =
-  let running_actor = MyActor.run actor;
+  MyActor.run actor;
   let n = 6 in
   let p = MyActor.send actor (Fib n) in
   Printf.printf "fib(%d) = %d\n" n @@ Promise.get p;
-  MyActor.Stop actor running_actor
+  MyActor.Stop actor
 ```
 
 ## Explanations
@@ -142,7 +143,9 @@ type 'm t = {
   (* Memory shared between methods *)
   memory : 'm Domain.DLS.key;
   (* Methods *)
-  methods : 'm t -> S.method_type
+  methods : 'm t -> S.method_type;
+  (* Domain in which the actor is running *)
+  mutable domain : unit Domain.t Option.t
 }
 ```
 
@@ -178,7 +181,7 @@ end
 type memory = unit
 let init () = ()
 
-module MyActor = Actor.Make(MyMessage)
+module MyActor = Actor.Make(Roundrobin)(MyMessage)
 
 let methods
   : type a . memory MyActor.t

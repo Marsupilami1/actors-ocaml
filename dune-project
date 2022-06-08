@@ -1,4 +1,4 @@
-(lang dune 3.2)
+(lang dune 3.1)
 
 (name actorsocaml)
 

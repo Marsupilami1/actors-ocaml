@@ -1,11 +1,13 @@
 # Actors-OCaml
 ## Compiling the project
 
-You can compile `actors-ocaml` and run the test executable simply by running:
+You can compile `actors-ocaml`, run the test executable and generate the documentation simply by running:
 
 ``` sh
 $ dune build
 $ dune test
+$ dune build @doc
+$ xdg-open _build/default/_doc/_html/index.html # to read the documentation, replace xdg-open by your favorite web browser
 ```
 
 

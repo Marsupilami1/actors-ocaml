@@ -28,13 +28,10 @@ module Make (S : Scheduler.S) (M : Message.S) : sig
       method is defined). *)
   val wait_for : (unit -> bool) -> unit
 
-  (** type of a running actor, only useful to stop the actor. *)
-  type running
-
   (** [run actor] starts the scheduler of [actor] and returns
       a [running] actor. *)
-  val run : 'm t -> running
+  val run : 'm t -> unit
 
   (** [stop actor r] stop the actor [actor], running as [r]. *)
-  val stop : 'm t -> running -> unit
+  val stop : 'm t -> unit
 end

@@ -19,9 +19,8 @@ and Ping : sig
   type 'm t
   val create : (unit -> 'm) -> ('m t -> MessagePing.method_type) -> 'm t
   val send : 'm t -> 'a MessagePing.t -> 'a Promise.t
-  type running
-  val run : 'm t -> running
-  val stop : 'm t -> running -> unit
+  val run : 'm t -> unit
+  val stop : 'm t -> unit
 end = Actor.Make(Roundrobin)(MessagePing)
 
 and MessagePong : sig
@@ -35,9 +34,8 @@ and Pong : sig
   type 'm t
   val create : (unit -> 'm) -> ('m t -> MessagePong.method_type) -> 'm t
   val send : 'm t -> 'a MessagePong.t -> 'a Promise.t
-  type running
-  val run : 'm t -> running
-  val stop : 'm t -> running -> unit
+  val run : 'm t -> unit
+  val stop : 'm t -> unit
 end = Actor.Make(Roundrobin)(MessagePong)
 
 
@@ -48,7 +46,7 @@ let ping_methods
     -> a
   = fun self forward -> function
     | Ping(pong, n) ->
-      (* Printf.printf "Ping: %d\n%!" n; *)
+      Printf.printf "Ping: %d\n%!" n;
       if n > 0 then
         forward @@ Pong.send pong (Pong(self, n - 1))
 let actor_ping_methods self = {
@@ -62,7 +60,7 @@ let pong_methods
     -> a
   = fun self forward -> function
     | Pong(ping, n) ->
-      (* Printf.printf "Pong: %d\n%!" n; *)
+      Printf.printf "Pong: %d\n%!" n;
       if n > 0 then
         forward @@ Ping.send ping (Ping(self, n - 1))
 let actor_pong_methods self = {
@@ -76,15 +74,15 @@ let _ =
 
   let ping = Ping.create init actor_ping_methods in
   let pong = Pong.create init actor_pong_methods in
-  let rping = Ping.run ping in
-  let rpong = Pong.run pong in
+  Ping.run ping;
+  Pong.run pong;
 
   (* TODO: solve deadlock issue *)
   let n = 1_000 in
   let p = Ping.send ping (Ping(pong, n)) in
   Promise.get p;
 
-  Ping.stop ping rping;
-  Pong.stop pong rpong;
+  Ping.stop ping;
+  Pong.stop pong;
 
   print_endline "------------------------"

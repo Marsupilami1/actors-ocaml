@@ -6,7 +6,6 @@ open Actorsocaml
 module rec MessageRing : sig
   type memory = {
     mutable next : memory RingMember.t Option.t;
-    mutable rn : RingMember.running Option.t
   }
   type 'a t =
     | Send : int -> unit t
@@ -17,7 +16,6 @@ end
 = struct
   type memory = {
     mutable next : memory RingMember.t Option.t;
-    mutable rn : RingMember.running Option.t
   }
   type 'a t =
     | Send : int -> unit t
@@ -31,12 +29,11 @@ and RingMember : sig
   val send : 'm t -> 'a MessageRing.t -> 'a Promise.t
   val get_memory : 'm t -> 'm
   val set_memory : 'm t -> 'm -> unit
-  type running
-  val run : 'm t -> running
-  val stop : 'm t -> running -> unit
+  val run : 'm t -> unit
+  val stop : 'm t -> unit
 end = Actor.Make(Roundrobin)(MessageRing)
 
-let init = fun _ -> { MessageRing.next = None; MessageRing.rn = None }
+let init = fun _ -> { MessageRing.next = None }
 
 let rec ring_methods
   : type a . MessageRing.memory RingMember.t
@@ -59,9 +56,8 @@ let rec ring_methods
         RingMember.set_memory self m
       end else begin
         let next = RingMember.create init actor_ring_methods in
-        let rn = RingMember.run next in
+        RingMember.run next;
         m.next <- Some next;
-        m.rn <- Some rn;
         RingMember.set_memory self m;
         forward @@ RingMember.send next (CreateRing(id+1, size, leader))
       end
@@ -70,7 +66,7 @@ let rec ring_methods
       let next = Option.get m.next in
       if next != leader then begin
         forward @@ RingMember.send next (Stop(leader));
-        RingMember.stop next (Option.get m.rn)
+        RingMember.stop next
       end
 
 
@@ -83,7 +79,7 @@ let leader = RingMember.create init actor_ring_methods
 
 let _ =
   print_endline "-----TEST RING------";
-  let rl = RingMember.run leader in
+  RingMember.run leader;
   let p = RingMember.send leader (CreateRing(1, 100, leader)) in
   Promise.get p;
   print_endline "Creation: Done";
@@ -94,7 +90,7 @@ let _ =
 
   let p'' = RingMember.send leader (Stop(leader)) in
   Promise.get p'';
-  RingMember.stop leader rl;
+  RingMember.stop leader;
   print_endline "Stop: Done";
 
   print_endline "Test passed";

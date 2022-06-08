@@ -28,11 +28,11 @@ let wait_for condition =
   perform @@ WaitFor condition
 
 
-let rec run fifo =
+let rec loop fifo =
   match_with manage_next_process fifo {
-    retc = (fun _ -> run fifo);
+    retc = (fun _ -> loop fifo);
     exnc = (fun e -> match e with
-        | Interrupt -> run fifo
+        | Interrupt -> loop fifo
         | _ -> raise e
       );
     effc = fun (type a) (e : a Effect.t) ->
@@ -44,7 +44,7 @@ let rec run fifo =
             (* back to the queue *)
             Promise.add_callback p (fun v ->
                 push_process fifo (fun _ -> continue k v));
-            run fifo;
+            loop fifo;
         )
       | WaitFor condition -> Some (
           fun (k : (a, _) continuation) ->
@@ -53,12 +53,15 @@ let rec run fifo =
             else (
               push_process fifo (fun _ ->
                   wait_for condition; continue k ());
-              run fifo
+              loop fifo
             )
         )
       | _ -> None
   }
 
+let run fifo = Domain.spawn (fun _ ->
+    loop fifo
+  )
 
 let stop fifo =
   push_process fifo (fun _ -> raise Stop);

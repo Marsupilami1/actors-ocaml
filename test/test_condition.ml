@@ -35,13 +35,13 @@ let actor_methods self = {
 let _ =
   print_endline "-----TEST Condition-----";
   let actor = MyActor.create init actor_methods in
-  let ra = MyActor.run actor in
+  MyActor.run actor;
 
   let pw = MyActor.send actor Wait in
   let _ = MyActor.send actor (Set 41) in
   let _ = MyActor.send actor (Set 42) in
   Promise.get pw;
 
-  MyActor.stop actor ra;
+  MyActor.stop actor;
   print_endline "Test passed";
   print_endline "--------------------"

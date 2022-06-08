@@ -50,7 +50,7 @@ let actor = MyActor.create init actor_methods
 
 let _ =
   print_endline "-----TEST ACTOR-----";
-  let ra = MyActor.run actor in
+  MyActor.run actor;
 
   let n = 42 in
   let p = Promise.join @@ MyActor.send actor (Fib n) in
@@ -64,6 +64,6 @@ let _ =
   (* let p'' = Promise.join @@ MyActor.send actor (Fibli(0, 1, 0, n'')) in *)
   (* ignore @@ Promise.get p''; *)
 
-  MyActor.stop actor ra;
+  MyActor.stop actor;
   print_endline "Test passed";
   print_endline "--------------------"

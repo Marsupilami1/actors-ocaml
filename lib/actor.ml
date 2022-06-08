@@ -4,13 +4,15 @@ module Make(S : Scheduler.S)(M : Message.S) = struct
   type 'm t = {
     scheduler : S.t;
     memory : 'm Domain.DLS.key;
-    methods : 'm t -> M.method_type
+    methods : 'm t -> M.method_type;
+    mutable domain : unit Domain.t Option.t
   }
 
   let create init methods = {
     scheduler = S.create ();
     memory = Domain.DLS.new_key init;
-    methods = methods
+    methods = methods;
+    domain = None
   }
 
   let get_memory self = Domain.DLS.get self.memory
@@ -32,14 +34,17 @@ module Make(S : Scheduler.S)(M : Message.S) = struct
     S.wait_for condition
 
 
-  type running = unit Domain.t
-  let run self = Domain.spawn (fun _ ->
-      S.run self.scheduler
-    )
+  let run self =
+    let domain = S.run self.scheduler in
+    self.domain <- Some domain
 
-  let stop self r =
-    S.stop self.scheduler;
-    (try Domain.join r with
-     | S.Stop -> () );
+  let stop self =
+    match self.domain with
+    | None -> failwith "Cannot stop non-running actor";
+    | Some d ->
+      S.stop self.scheduler;
+      (try Domain.join d with
+       | S.Stop -> ()
+      );
 
 end

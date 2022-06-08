@@ -28,9 +28,9 @@ let _ =
   print_endline "-----TEST BENCH-----";
 
   let message = MyMessage.Pass () in
-  let ra = MyActor.run actor in
+  MyActor.run actor;
   ignore @@ MyActor.send actor message;
   Unix.sleep 1;
-  MyActor.stop actor ra;
+  MyActor.stop actor;
   print_endline "Test passed";
   print_endline "--------------------"

@@ -88,7 +88,7 @@ let _ =
   Promise.get p;
   print_endline "Creation: Done";
 
-  let p' = RingMember.send leader (Send(1_000_000)) in
+  let p' = RingMember.send leader (Send(1_000)) in
   Promise.get p';
   print_endline "Cycle: Done";
 

@@ -1,11 +1,11 @@
 (** Makes an actor from a {!Message.S}. *)
-module Make (S : Message.S) : sig
+module Make (S : Scheduler.S) (M : Message.S) : sig
   (** The type of the actor, ['m] is the type of memory. *)
   type 'm t
 
   (** [create init methods] returns an actor with memory
       [init ()] and methods [methods]. *)
-  val create : (unit -> 'm) -> ('m t -> S.method_type) -> 'm t
+  val create : (unit -> 'm) -> ('m t -> M.method_type) -> 'm t
 
   (** [async self f] computes [f] asynchronously, storing
       the result of the compoutation in a {!Promise.t}. *)
@@ -14,7 +14,7 @@ module Make (S : Message.S) : sig
   (** [send self message] sends the message [message] to
       the actor [self]. It immediatly returns a promise
       of the result. *)
-  val send : 'm t -> 'a S.t -> 'a Promise.t
+  val send : 'm t -> 'a M.t -> 'a Promise.t
 
   (** [get_memory self] returns the local memory of
       the actor [self]. *)

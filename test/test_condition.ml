@@ -10,7 +10,7 @@ end
 type memory = int
 let init () = 0
 
-module MyActor = Actor.Make(MyMessage)
+module MyActor = Actor.Make(Roundrobin)(MyMessage)
 
 let methods
   : type a . memory MyActor.t

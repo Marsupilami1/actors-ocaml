@@ -22,7 +22,7 @@ and Ping : sig
   type running
   val run : 'm t -> running
   val stop : 'm t -> running -> unit
-end = Actor.Make(MessagePing)
+end = Actor.Make(Roundrobin)(MessagePing)
 
 and MessagePong : sig
   type 'a t = Pong : memory Ping.t * int -> unit t
@@ -38,7 +38,7 @@ and Pong : sig
   type running
   val run : 'm t -> running
   val stop : 'm t -> running -> unit
-end = Actor.Make(MessagePong)
+end = Actor.Make(Roundrobin)(MessagePong)
 
 
 let ping_methods

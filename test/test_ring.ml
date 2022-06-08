@@ -34,7 +34,7 @@ and RingMember : sig
   type running
   val run : 'm t -> running
   val stop : 'm t -> running -> unit
-end = Actor.Make(MessageRing)
+end = Actor.Make(Roundrobin)(MessageRing)
 
 let init = fun _ -> { MessageRing.next = None; MessageRing.rn = None }
 

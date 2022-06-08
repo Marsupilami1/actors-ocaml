@@ -6,7 +6,7 @@ module MyMessage = struct
   type method_type = { m : 'a . ('a Promise.t -> 'a) -> 'a t -> 'a }
 end
 
-module MyActor = Actor.Make(MyMessage)
+module MyActor = Actor.Make(Roundrobin)(MyMessage)
 
 
 let methods

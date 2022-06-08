@@ -12,7 +12,7 @@ end
 type memory = int Promise.t Option.t Array.t
 let init () = Array.make 20000 None
 
-module MyActor = Actor.Make(MyMessage)
+module MyActor = Actor.Make(Roundrobin)(MyMessage)
 
 let methods
   : type a . memory MyActor.t

@@ -41,7 +41,7 @@ Once declared, we can define the `fib` function:
 ``` ocaml
 let actor_methods =
   let methods
-    : type a . memory MyActor.t (* Actor *)
+    : type a . MyActor.t (* Actor *)
       -> (a Promise.t -> a) (* forward function, not used here*)
       -> a MyMessage.t (* message received *)
       -> a (* return type *)
@@ -126,7 +126,7 @@ Of course, the value will be returned if it is available.
 ### Actors
 #### Type
 
-An actor is a  bunch of functions, a shared memory and a scheduler, its definition is:
+An actor is a  bunch of functions and a scheduler, its definition is:
 
 ``` ocaml
 type t = {
@@ -139,7 +139,7 @@ type t = {
 }
 ```
 
-The `process` type is a simple `unit -> unit`, we use a domain local state `DLS` to make the memory "Domain local". `S` is the module containing the method type (See the exemple).
+The `process` type is a simple `unit -> unit`. `S` is the module containing the method type (See the exemple).
 
 #### Creation
 
@@ -164,38 +164,35 @@ module MyMessage = struct
   type method_type = { m : 'a . ('a Promise.t -> 'a) -> 'a t -> 'a }
 end
 
-type memory = unit
-let init () = ()
-
 module MyActor = Actor.Make(Roundrobin)(MyMessage)
 
-let methods
-  : type a . memory MyActor.t
-    -> (a Promise.t -> a)
-    -> a MyMessage.t
-    -> a
-  = fun self _ -> function
-  | Syracuse n ->
-    if n = 1 then
-      Promise.pure 1
-    else begin
-      let next = if n mod 2 = 0 then n / 2 else 3 * n + 1 in
-      Promise.await @@ MyActor.send self (Syracuse(next))
-    end
-let actor_methods self = {
-  MyMessage.m = fun s -> methods self s
-}
+let actor_methods =
+  let methods
+    : type a . MyActor.t
+      -> (a Promise.t -> a)
+      -> a MyMessage.t
+      -> a
+    = fun self _ -> function
+      | Syracuse n ->
+        if n = 1 then
+          Promise.pure 1
+        else begin
+          let next = if n mod 2 = 0 then n / 2 else 3 * n + 1 in
+          Promise.await @@ MyActor.send self (Syracuse(next))
+        end
+  in fun self ->
+    {MyMessage.m = fun forward -> methods self forward}
 
 let main _ =
-  let actor = MyActor.create init actor_methods in
-  let ra = MyActor.run actor in
+  let actor = MyActor.create actor_methods in
+  MyActor.run actor;
 
-  let n = 42 in
+  let n = 989345275647 in
   let p = Promise.join @@ MyActor.send actor (Syracuse n) in
-  ignore @@ Promise.await p;
+  assert (1 = Promise.await p);
 
-  MyActor.stop actor ra;
-  
+  MyActor.stop actor
+
 let _ = Actor.Main.run main
 ```
 
@@ -226,4 +223,4 @@ The current promise to fill becomes `Forwarded (Atomic.make p')` where `p'` it t
 We use a `union-find` like structure for the forwarded promises, with path compression.
 
 ## Exemples
-See `test/test_{actor; pingpong; ring; condition; bench}.ml`
+See `test/test_{actor; pingpong; ring; condition; bench; syracuse}.ml`

@@ -27,3 +27,8 @@
  (libraries actorsocaml)
  (name test_condition)
  (modules test_condition))
+
+(test
+ (libraries actorsocaml)
+ (name test_syracuse)
+ (modules test_syracuse))

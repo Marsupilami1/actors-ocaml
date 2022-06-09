@@ -39,36 +39,29 @@ We could have define the `flip` function by adding the constructor:
 Once declared, we can define the `fib` function:
 
 ``` ocaml
-let methods
-  : type a . memory MyActor.t (* Actor *)
-    -> (a Promise.t -> a) (* forward function, not used here*)
-    -> a MyMessage.t (* message received *)
-    -> a (* return type *)
-  = fun self _ -> function
-  | Fib n ->
-    if n < 2 then n else begin
-      let p1 = MyActor.send self (Fib (n - 1)) in
-      let p2 = MyActor.send self (Fib (n - 2)) in
-      Promise.await p1 + Promise.await p2
-    end
-
-let actor_methods self = {
-  MyMessage.m = fun s -> methods self s
-}
-```
+let actor_methods =
+  let methods
+    : type a . memory MyActor.t (* Actor *)
+      -> (a Promise.t -> a) (* forward function, not used here*)
+      -> a MyMessage.t (* message received *)
+      -> a (* return type *)
+    = fun self _ -> function
+      | Fib n ->
+        if n < 2 then n else begin
+          let p1 = MyActor.send self (Fib (n - 1)) in
+          let p2 = MyActor.send self (Fib (n - 2)) in
+          Promise.await p1 + Promise.await p2
+        end
+  in fun self ->
+    {MyMessage.m = fun forward -> methods self forward}
 
 The type annotation is significant, because `MyMessage.t` is a GADT, and we want a function of type `'a . 'a MyMessage.t -> 'a` (In fact, we want a `'a . ('a Promise.t -> 'a) -> 'a MyMessage.t -> 'a`, see the Forward section)
-
-Our actor does not need any memory, so we define a trivial `init` function:
-
-``` ocaml
-let init () = ()
 ```
 
 And we can finally create the actor with `MyActor.create`:
 
 ``` ocaml
-let actor = MyActor.create init actor_methods
+let actor = MyActor.create actor_methods
 ```
 
 The main function could look like:
@@ -136,13 +129,11 @@ Of course, the value will be returned if it is available.
 An actor is a  bunch of functions, a shared memory and a scheduler, its definition is:
 
 ``` ocaml
-type 'm t = {
+type t = {
   (* Currently running processes *)
   processes : process Domainslib.Chan.t;
-  (* Memory shared between methods *)
-  memory : 'm Domain.DLS.key;
   (* Methods *)
-  methods : 'm t -> S.method_type;
+  methods : t -> S.method_type;
   (* Domain in which the actor is running *)
   mutable domain : unit Domain.t Option.t
 }
@@ -150,16 +141,16 @@ type 'm t = {
 
 The `process` type is a simple `unit -> unit`, we use a domain local state `DLS` to make the memory "Domain local". `S` is the module containing the method type (See the exemple).
 
-It is parameterized on `'m`, which is the type of the shared memory.
-
 #### Creation
 
-To create an actor, you only need to specify its methods and its shared memory.
+To create an actor, you only need to specify its methods.
 A method is a function which takes an actor (`self`) and a message.
 
 #### Execution
 To run an actor, just call the `run` function on it.
 It will spawn a new thread and run the scheduler.
+
+You need to stop actors yourself for now, I hope this will be automatic in the future.
 
 ## Forward
 Let's consider the following actor:
@@ -194,7 +185,6 @@ let methods
 let actor_methods self = {
   MyMessage.m = fun s -> methods self s
 }
-
 
 let main _ =
   let actor = MyActor.create init actor_methods in

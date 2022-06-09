@@ -1,6 +1,5 @@
 (* Module Actor *)
 module Make(S : Scheduler.S)(M : Message.S) = struct
-  (* Type of Actors, 'm is the type of memory *)
   type t = {
     scheduler : S.t;
     methods : t -> M.method_type;

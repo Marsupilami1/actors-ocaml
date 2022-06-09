@@ -1,10 +1,9 @@
 (** Makes an actor from a {!Message.S}. *)
 module Make (S : Scheduler.S) (M : Message.S) : sig
-  (** The type of the actor, ['m] is the type of memory. *)
+  (** The type of the actor. *)
   type t
 
-  (** [create init methods] returns an actor with memory
-      [init ()] and methods [methods]. *)
+  (** [create methods] returns an actor with methods [methods]. *)
   val create : (t -> M.method_type) -> t
 
   (** [async self f] computes [f] asynchronously, storing

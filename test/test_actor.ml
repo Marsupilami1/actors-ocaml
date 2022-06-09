@@ -44,10 +44,11 @@ let actor_methods =
     end
 in fun self -> {MyMessage.m = fun forward -> methods self forward}
 
-let actor = MyActor.create actor_methods
 
 let main _ =
   print_endline "-----TEST ACTOR-----";
+
+  let actor = MyActor.create actor_methods in
   MyActor.run actor;
 
   let n = 42 in

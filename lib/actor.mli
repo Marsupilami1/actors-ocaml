@@ -35,7 +35,8 @@ module Make (S : Scheduler.S) (M : Message.S) : sig
   val stop : 'm t -> unit
 end
 
-
+(** The [Main] Actor, which runs the [main] function. *)
 module Main : sig
+  (** Calling [run main] is mandatory in your programs. *)
   val run : (unit -> unit) -> unit
 end

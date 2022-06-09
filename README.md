@@ -74,12 +74,14 @@ let actor = MyActor.create init actor_methods
 The main function could look like:
 
 ``` ocaml
-let _ =
+let main _ =
   MyActor.run actor;
   let n = 6 in
   let p = MyActor.send actor (Fib n) in
-  Printf.printf "fib(%d) = %d\n" n @@ Promise.get p;
+  Printf.printf "fib(%d) = %d\n" n @@ Promise.await p;
   MyActor.Stop actor
+  
+let _ = Actor.Main.run main
 ```
 
 ## Explanations
@@ -123,12 +125,9 @@ Trying to fill in the same promise twice raises a `Promise__Multiple_Write` erro
 
 #### Reading
 
-You have two ways to read the value from a promise:
+You can get the value of a promise with `await`. It will throw the effect `NotReady p` if the value is not available, so it can then be handled by a scheduler (That's why the call to `Actor.Main.run` is mandatory).
 
--   `get` is blocking, so you can use it if someone else is doing the computation in *parallel*
--   `await` will throw the effect `NotReady p` if the value is not available. It can then be handled by a scheduler to compute the value *concurently*.
-
-In both case, the value will be returned if it is available.
+Of course, the value will be returned if it is available.
 
 
 ### Actors
@@ -157,10 +156,6 @@ It is parameterized on `'m`, which is the type of the shared memory.
 
 To create an actor, you only need to specify its methods and its shared memory.
 A method is a function which takes an actor (`self`) and a message.
-
-Do not use `Promise.get` on a promise obtained by `self`, you'll get stuck on a value that will never be calculated.
-Maybe this will be ensured by the type system in the future (maybe not).
-In general, you don't need to use `Promise.await`, `pure` and `bind` should be general enough for your code (see also the Forward section).
 
 #### Execution
 To run an actor, just call the `run` function on it.
@@ -201,15 +196,17 @@ let actor_methods self = {
 }
 
 
-let _ =
+let main _ =
   let actor = MyActor.create init actor_methods in
   let ra = MyActor.run actor in
 
   let n = 42 in
   let p = Promise.join @@ MyActor.send actor (Syracuse n) in
-  ignore @@ Promise.get p;
+  ignore @@ Promise.await p;
 
   MyActor.stop actor ra;
+  
+let _ = Actor.Main.run main
 ```
 
 This program generates 9 differents promises (one for each call of send), and each promise has one callback function to push the continuation back to the scheduler queue.
@@ -228,7 +225,6 @@ But the faster solution is to use forward:
 ``` diff
 - = fun self _ -> function
 + = fun self forward -> function
-
 -     Promise.await @@ MyActor.send self (Syracuse(next))
 +     forward @@ MyActor.send self (Syracuse(next))
 ```

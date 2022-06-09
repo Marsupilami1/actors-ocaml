@@ -48,3 +48,23 @@ module Make(S : Scheduler.S)(M : Message.S) = struct
       );
 
 end
+
+
+module Main = struct
+  module MainMessage = struct
+    type 'a t
+    type method_type = { m : 'a . ('a Promise.t -> 'a) -> 'a t -> 'a }
+  end
+  module MainScheduler = struct
+    include Roundrobin
+    let run fifo = loop fifo; exit 0
+  end
+
+  include Make(MainScheduler)(MainMessage)
+  let run main =
+    let fifo = MainScheduler.create () in
+    MainScheduler.push_process fifo (fun () ->
+         main (); raise MainScheduler.Stop);
+    try MainScheduler.run fifo with
+    | MainScheduler.Stop -> exit 0
+end

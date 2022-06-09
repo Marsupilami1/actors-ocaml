@@ -48,22 +48,25 @@ let actor_methods self = {
 
 let actor = MyActor.create init actor_methods
 
-let _ =
+let main _ =
   print_endline "-----TEST ACTOR-----";
   MyActor.run actor;
 
   let n = 42 in
   let p = Promise.join @@ MyActor.send actor (Fib n) in
-  assert (267914296 = Promise.get p);
+  assert (267914296 = Promise.await p);
 
   (* let n' = 5_000_000 in *)
   (* let p' = Promise.join @@ MyActor.send actor (ToZero n') in *)
-  (* Promise.get p'; *)
+  (* Promise.await p'; *)
 
   (* let n'' = 5_000_000 in *)
   (* let p'' = Promise.join @@ MyActor.send actor (Fibli(0, 1, 0, n'')) in *)
-  (* ignore @@ Promise.get p''; *)
+  (* ignore @@ Promise.await p''; *)
 
   MyActor.stop actor;
   print_endline "Test passed";
   print_endline "--------------------"
+
+
+let _ = Actor.Main.run main

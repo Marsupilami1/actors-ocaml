@@ -24,7 +24,7 @@ let init = Fun.id
 
 let actor = MyActor.create init actor_methods
 
-let _ =
+let main _ =
   print_endline "-----TEST BENCH-----";
 
   let message = MyMessage.Pass () in
@@ -34,3 +34,5 @@ let _ =
   MyActor.stop actor;
   print_endline "Test passed";
   print_endline "--------------------"
+
+let _ = Actor.Main.run main

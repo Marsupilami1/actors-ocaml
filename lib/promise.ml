@@ -48,15 +48,6 @@ let rec await p =
   | Filled v -> v
   | Forwarded p' -> await (find_leader p')
 
-(* get is blocking *)
-let rec get p =
-  match Atomic.get p with
-  | Empty _ -> Domain.cpu_relax (); get p
-  | Filled v -> v
-  | Forwarded p' -> get (find_leader p')
-
-
-
 
 let rec is_ready p =
   match Atomic.get p with

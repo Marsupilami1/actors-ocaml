@@ -34,3 +34,8 @@ module Make (S : Scheduler.S) (M : Message.S) : sig
   (** [stop actor] stops the actor [actor] *)
   val stop : 'm t -> unit
 end
+
+
+module Main : sig
+  val run : (unit -> unit) -> unit
+end

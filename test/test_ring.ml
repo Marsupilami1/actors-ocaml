@@ -77,21 +77,24 @@ and actor_ring_methods self = {
 
 let leader = RingMember.create init actor_ring_methods
 
-let _ =
+let main _ =
   print_endline "-----TEST RING------";
   RingMember.run leader;
   let p = RingMember.send leader (CreateRing(1, 100, leader)) in
-  Promise.get p;
+  Promise.await p;
   print_endline "Creation: Done";
 
   let p' = RingMember.send leader (Send(1_000)) in
-  Promise.get p';
+  Promise.await p';
   print_endline "Cycle: Done";
 
   let p'' = RingMember.send leader (Stop(leader)) in
-  Promise.get p'';
+  Promise.await p'';
   RingMember.stop leader;
   print_endline "Stop: Done";
 
   print_endline "Test passed";
-  print_endline "--------------------";
+  print_endline "--------------------"
+
+
+let _ = Actor.Main.run main

@@ -69,7 +69,7 @@ let actor_pong_methods self = {
 
 
 
-let _ =
+let main _ =
   print_endline "-----TEST PINGPONG------";
 
   let ping = Ping.create init actor_ping_methods in
@@ -80,9 +80,11 @@ let _ =
   (* TODO: solve deadlock issue *)
   let n = 1_000 in
   let p = Ping.send ping (Ping(pong, n)) in
-  Promise.get p;
+  Promise.await p;
 
   Ping.stop ping;
   Pong.stop pong;
 
   print_endline "------------------------"
+
+let _ = Actor.Main.run main

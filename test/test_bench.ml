@@ -9,20 +9,18 @@ end
 module MyActor = Actor.Make(Roundrobin)(MyMessage)
 
 
-let methods
-  : type a . 'm MyActor.t
-    -> (a Promise.t -> a)
-    -> a MyMessage.t
-    -> a =
-  fun _ _ -> function
-    | Pass () -> ()
-let actor_methods self = {
-  MyMessage.m = fun s -> methods self s
-}
+let actor_methods =
+  let methods
+    : type a . MyActor.t
+      -> (a Promise.t -> a)
+      -> a MyMessage.t
+      -> a =
+    fun _ _ -> function
+      | Pass () -> ()
+  in
+  fun self -> {MyMessage.m = fun forward -> methods self forward}
 
-let init = Fun.id
-
-let actor = MyActor.create init actor_methods
+let actor = MyActor.create actor_methods
 
 let main _ =
   print_endline "-----TEST BENCH-----";

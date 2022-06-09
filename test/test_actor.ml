@@ -9,19 +9,21 @@ module MyMessage = struct
   type method_type = { m : 'a . ('a Promise.t -> 'a) -> 'a t -> 'a }
 end
 
-type memory = int Promise.t Option.t Array.t
-let init () = Array.make 20000 None
-
 module MyActor = Actor.Make(Roundrobin)(MyMessage)
 
-let methods
-  : type a . memory MyActor.t
+
+let actor_methods =
+  let init : unit -> int Promise.t Option.t Array.t
+    = fun _ -> Array.make 2000 None in
+  let mem = Domain.DLS.new_key init in
+  let methods
+  : type a . MyActor.t
     -> (a Promise.t -> a)
     -> a MyMessage.t
     -> a
   = fun self forward -> function
   | Fib n ->
-    let m = MyActor.get_memory self in
+    let m = Domain.DLS.get mem in
     if m.(n) <> None then
       Option.get m.(n)
     else if n < 2 then Promise.pure n else begin
@@ -40,13 +42,9 @@ let methods
     else begin
       forward @@ MyActor.send self (ToZero (n - 1))
     end
+in fun self -> {MyMessage.m = fun forward -> methods self forward}
 
-
-let actor_methods self = {
-  MyMessage.m = fun s -> methods self s
-}
-
-let actor = MyActor.create init actor_methods
+let actor = MyActor.create actor_methods
 
 let main _ =
   print_endline "-----TEST ACTOR-----";

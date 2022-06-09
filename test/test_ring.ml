@@ -4,78 +4,69 @@ open Actorsocaml
 
 
 module rec MessageRing : sig
-  type memory = {
-    mutable next : memory RingMember.t Option.t;
-  }
   type 'a t =
     | Send : int -> unit t
-    | Stop : memory RingMember.t -> unit t
-    | CreateRing : int * int * memory RingMember.t -> unit t
+    | Stop : RingMember.t -> unit t
+    | CreateRing : int * int * RingMember.t -> unit t
   type method_type = { m : 'a . ('a Promise.t -> 'a) -> 'a t -> 'a }
 end
 = struct
-  type memory = {
-    mutable next : memory RingMember.t Option.t;
-  }
   type 'a t =
     | Send : int -> unit t
-    | Stop : memory RingMember.t -> unit t
-    | CreateRing : int * int * memory RingMember.t -> unit t
+    | Stop : RingMember.t -> unit t
+    | CreateRing : int * int * RingMember.t -> unit t
   type method_type = { m : 'a . ('a Promise.t -> 'a) -> 'a t -> 'a }
 end
 and RingMember : sig
-  type 'm t
-  val create : (unit -> 'm) -> ('m t -> MessageRing.method_type) -> 'm t
-  val send : 'm t -> 'a MessageRing.t -> 'a Promise.t
-  val get_memory : 'm t -> 'm
-  val set_memory : 'm t -> 'm -> unit
-  val run : 'm t -> unit
-  val stop : 'm t -> unit
+  type t
+  val create : (t -> MessageRing.method_type) -> t
+  val send : t -> 'a MessageRing.t -> 'a Promise.t
+  val run : t -> unit
+  val stop : t -> unit
 end = Actor.Make(Roundrobin)(MessageRing)
 
-let init = fun _ -> { MessageRing.next = None }
+type memory = {mutable next : RingMember.t Option.t}
+let rec actor_ring_methods =
+  let init = fun _ -> { next = None } in
+  let mem = Domain.DLS.new_key init in
+  let ring_methods
+    : type a . RingMember.t
+      -> (a Promise.t -> a)
+      -> a MessageRing.t
+      -> a
+    = fun _ forward -> function
+      | Send(n) ->
+        if n < 0 then () else begin
+          (* Printf.printf "%d\n%!" n; *)
+          let m = Domain.DLS.get mem in
+          match m.next with
+          | None -> print_endline "abort"
+          | Some next -> forward @@ RingMember.send next (Send(n-1))
+        end
+      | CreateRing(id, size, leader) ->
+        let m = Domain.DLS.get mem in
+        if id >= size then begin
+          m.next <- Some leader;
+          Domain.DLS.set mem m
+        end else begin
+          let next = RingMember.create actor_ring_methods in
+          RingMember.run next;
+          m.next <- Some next;
+          Domain.DLS.set mem m;
+          forward @@ RingMember.send next (CreateRing(id+1, size, leader))
+        end
+      | Stop(leader) ->
+        let m = Domain.DLS.get mem in
+        let next = Option.get m.next in
+        if next != leader then begin
+          forward @@ RingMember.send next (Stop(leader));
+          RingMember.stop next
+        end
+  in fun self ->
+    {MessageRing.m = fun forward -> ring_methods self forward}
 
-let rec ring_methods
-  : type a . MessageRing.memory RingMember.t
-    -> (a Promise.t -> a)
-    -> a MessageRing.t
-    -> a
-  = fun self forward -> function
-    | Send(n) ->
-      if n < 0 then () else begin
-        (* Printf.printf "%d\n%!" n; *)
-        let m = RingMember.get_memory self in
-        match m.next with
-        | None -> print_endline "abort"
-        | Some next -> forward @@ RingMember.send next (Send(n-1))
-      end
-    | CreateRing(id, size, leader) ->
-      let m = RingMember.get_memory self in
-      if id >= size then begin
-        m.next <- Some leader;
-        RingMember.set_memory self m
-      end else begin
-        let next = RingMember.create init actor_ring_methods in
-        RingMember.run next;
-        m.next <- Some next;
-        RingMember.set_memory self m;
-        forward @@ RingMember.send next (CreateRing(id+1, size, leader))
-      end
-    | Stop(leader) ->
-      let m = RingMember.get_memory self in
-      let next = Option.get m.next in
-      if next != leader then begin
-        forward @@ RingMember.send next (Stop(leader));
-        RingMember.stop next
-      end
 
-
-and actor_ring_methods self = {
-  MessageRing.m = fun s -> ring_methods self s
-}
-
-
-let leader = RingMember.create init actor_ring_methods
+let leader = RingMember.create actor_ring_methods
 
 let main _ =
   print_endline "-----TEST RING------";

@@ -1,27 +1,20 @@
 (** Makes an actor from a {!Message.S}. *)
 module Make (S : Scheduler.S) (M : Message.S) : sig
   (** The type of the actor, ['m] is the type of memory. *)
-  type 'm t
+  type t
 
   (** [create init methods] returns an actor with memory
       [init ()] and methods [methods]. *)
-  val create : (unit -> 'm) -> ('m t -> M.method_type) -> 'm t
+  val create : (t -> M.method_type) -> t
 
   (** [async self f] computes [f] asynchronously, storing
       the result of the compoutation in a {!Promise.t}. *)
-  val async : 'm t -> (unit -> 'a) -> 'a Promise.t
+  val async : t -> (unit -> 'a) -> 'a Promise.t
 
   (** [send self message] sends the message [message] to
       the actor [self]. It immediatly returns a promise
       of the result. *)
-  val send : 'm t -> 'a M.t -> 'a Promise.t
-
-  (** [get_memory self] returns the local memory of
-      the actor [self]. *)
-  val get_memory : 'm t -> 'm
-
-  (** [set_memory self m] replace [self]'s memory by [m]. *)
-  val set_memory : 'm t -> 'm -> unit
+  val send : t -> 'a M.t -> 'a Promise.t
 
   (** [wait_for condition] produces an active wait of the
       condition inside the current actor (In which the 
@@ -29,10 +22,10 @@ module Make (S : Scheduler.S) (M : Message.S) : sig
   val wait_for : (unit -> bool) -> unit
 
   (** [run actor] starts the scheduler of [actor] *)
-  val run : 'm t -> unit
+  val run : t -> unit
 
   (** [stop actor] stops the actor [actor] *)
-  val stop : 'm t -> unit
+  val stop : t -> unit
 end
 
 (** The [Main] Actor, which runs the [main] function. *)

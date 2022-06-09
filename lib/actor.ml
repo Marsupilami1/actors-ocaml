@@ -43,6 +43,7 @@ module Make(S : Scheduler.S)(M : Message.S) = struct
     | None -> failwith "Cannot stop non-running actor";
     | Some d ->
       S.stop self.scheduler;
+      self.domain <- None;
       (try Domain.join d with
        | S.Stop -> ()
       );

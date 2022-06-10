@@ -29,7 +29,6 @@ module Make(S : Scheduler.S)(M : Message.S) = struct
 
 
   let stop self =
-    print_endline "stopped";
     match self.domain with
     | None -> failwith "Cannot stop non-running actor";
     | Some d ->

@@ -71,8 +71,7 @@ let main _ =
   MyActor.run actor;
   let n = 6 in
   let p = MyActor.send actor (Fib n) in
-  Printf.printf "fib(%d) = %d\n" n @@ Promise.await p;
-  MyActor.Stop actor
+  Printf.printf "fib(%d) = %d\n" n @@ Promise.await p
   
 let _ = Actor.Main.run main
 ```
@@ -150,7 +149,7 @@ A method is a function which takes an actor (`self`) and a message.
 To run an actor, just call the `run` function on it.
 It will spawn a new thread and run the scheduler.
 
-You need to stop actors yourself for now, I hope this will be automatic in the future.
+Actors are stopped automatically thanks to a hook on the garbarge collector.
 
 ## Forward
 Let's consider the following actor:
@@ -189,9 +188,7 @@ let main _ =
 
   let n = 42 in
   let p = Promise.join @@ MyActor.send actor (Syracuse n) in
-  assert (1 = Promise.await p);
-
-  MyActor.stop actor
+  assert (1 = Promise.await p)
 
 let _ = Actor.Main.run main
 ```

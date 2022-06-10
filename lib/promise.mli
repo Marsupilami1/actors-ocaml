@@ -11,6 +11,9 @@ type 'a t
 (** Effect raised by the {!await} function. *)
 type _ Effect.t += NotReady : 'a t -> 'a Effect.t
 
+(** Effect raised by the {!async} function. *)
+type _ Effect.t += Async : (unit -> unit) -> unit Effect.t
+
 (** Raised when multiple fulfillment occur on the same promise *)
 exception Promise__Multiple_Write
 
@@ -55,6 +58,10 @@ val join : 'a t t -> 'a t
 
 (** [bind m f] is the classic monadic bind function. *)
 val bind : 'a t -> ('a -> 'b t) -> 'b t
+
+(** [async f] computes [f] asynchronously, it directly
+    returns a promise *)
+val async : (unit -> 'a) -> 'a t
 
 (** The following module defines infix operators for cleaner
     code. *)

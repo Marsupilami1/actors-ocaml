@@ -12,11 +12,6 @@ module Make(S : Scheduler.S)(M : Message.S) = struct
     domain = None
   }
 
-  let async self f =
-    let (p, fill) = Promise.create () in
-    S.push_process self.scheduler (fun _ -> fill (f ()));
-    p
-
   let send self message =
     let (p, fill) = Promise.create () in
     let forward p' = Promise.unify p p'; raise S.Interrupt in
@@ -57,8 +52,10 @@ module Main = struct
   end
 
   include Make(MainScheduler)(MainMessage)
+
+  let fifo = MainScheduler.create ()
+
   let run main =
-    let fifo = MainScheduler.create () in
     MainScheduler.push_process fifo (fun () ->
         main (); Gc.full_major (); raise MainScheduler.Stop);
     try MainScheduler.run fifo with

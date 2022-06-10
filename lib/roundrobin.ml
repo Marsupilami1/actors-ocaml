@@ -46,6 +46,11 @@ let rec loop fifo =
                 push_process fifo (fun _ -> continue k v));
             loop fifo;
         )
+      | Promise.Async f -> Some (
+          fun (k : (a, _) continuation) ->
+            push_process fifo f;
+            continue k ()
+        )
       | WaitFor condition -> Some (
           fun (k : (a, _) continuation) ->
             if condition () then

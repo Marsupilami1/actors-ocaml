@@ -56,6 +56,10 @@ let test7 () =
   assert (Promise.await p = 42);
   print_endline "Test 7 : Passed"
 
+let test8 () =
+  let p = Promise.async (fun () -> 42) in
+  assert (Promise.await p = 42);
+  print_endline "Test 8 : Passed"
 
 
 let main _ =
@@ -67,6 +71,7 @@ let main _ =
   test5 ();
   test6 ();
   test7 ();
+  test8 ();
   print_endline "----------------------"
 
 let _ = Actor.Main.run main

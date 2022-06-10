@@ -109,6 +109,13 @@ let bind m f =
   join p
 
 
+type _ Effect.t += Async : (unit -> unit) -> unit Effect.t
+
+let async f =
+  let (p, fill) = create () in
+  perform (Async (fun _ -> fill @@ f ()));
+  p
+
 module Infix = struct
   let (<$>) = fmap
   let (<*>) pf px =
@@ -122,6 +129,6 @@ module Infix = struct
   let (>>=) = bind
   let (=<<) f m = m >>= f
 
-  let ( let* ) x f = x >>= f
+  let ( let* ) = (>>=)
   let ( and* ) x y = (fun x y -> (x, y)) <$> x <*> y
 end

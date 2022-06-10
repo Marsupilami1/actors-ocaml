@@ -6,10 +6,6 @@ module Make (S : Scheduler.S) (M : Message.S) : sig
   (** [create methods] returns an actor with methods [methods]. *)
   val create : (t -> M.method_type) -> t
 
-  (** [async self f] computes [f] asynchronously, storing
-      the result of the compoutation in a {!Promise.t}. *)
-  val async : t -> (unit -> 'a) -> 'a Promise.t
-
   (** [send self message] sends the message [message] to
       the actor [self]. It immediatly returns a promise
       of the result. *)

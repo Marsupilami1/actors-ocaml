@@ -69,21 +69,22 @@ let rec actor_ring_methods =
 
 let main _ =
   print_endline "-----TEST RING------";
-  let leader = RingMember.create actor_ring_methods in
-  RingMember.run leader;
-  let p = RingMember.send leader (CreateRing(1, 10, leader)) in
-  Promise.await p;
-  print_endline "Creation: Done";
+  let _ =
+    let leader = RingMember.create actor_ring_methods in
+    RingMember.run leader;
+    let p = RingMember.send leader (CreateRing(1, 10, leader)) in
+    Promise.await p;
+    print_endline "Creation: Done";
 
-  let p' = RingMember.send leader (Send(10)) in
-  Promise.await p';
-  print_endline "Cycle: Done";
+    let p' = RingMember.send leader (Send(10)) in
+    Promise.await p';
+    print_endline "Cycle: Done";
 
-  let p'' = RingMember.send leader (Stop(leader)) in
-  Promise.await p'';
-  (* RingMember.stop leader; *)
-  print_endline "Stop: Done";
-
+    let p'' = RingMember.send leader (Stop(leader)) in
+    Promise.await p'';
+    (* RingMember.stop leader; *)
+    print_endline "Stop: Done";
+  in
   print_endline "Test passed";
   print_endline "--------------------"
 

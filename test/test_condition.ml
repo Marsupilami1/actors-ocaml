@@ -41,7 +41,6 @@ let main _ =
   let _ = MyActor.send actor (Set 42) in
   Promise.await pw;
 
-  MyActor.stop actor;
   print_endline "Test passed";
   print_endline "--------------------"
 

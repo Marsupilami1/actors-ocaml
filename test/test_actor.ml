@@ -63,7 +63,6 @@ let main _ =
   (* let p'' = Promise.join @@ MyActor.send actor (Fibli(0, 1, 0, n'')) in *)
   (* ignore @@ Promise.await p''; *)
 
-  MyActor.stop actor;
   print_endline "Test passed";
   print_endline "--------------------"
 

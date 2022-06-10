@@ -37,7 +37,6 @@ let main _ =
   let p = Promise.join @@ MyActor.send actor (Syracuse n) in
   assert (1 = Promise.await p);
 
-  MyActor.stop actor;
   print_endline "Test passed";
   print_endline "-----------------------"
 

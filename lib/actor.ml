@@ -28,19 +28,21 @@ module Make(S : Scheduler.S)(M : Message.S) = struct
     S.wait_for condition
 
 
-  let run self =
-    let domain = S.run self.scheduler in
-    self.domain <- Some domain
-
   let stop self =
+    print_endline "stopped";
     match self.domain with
     | None -> failwith "Cannot stop non-running actor";
     | Some d ->
       S.stop self.scheduler;
       self.domain <- None;
-      (try Domain.join d with
+      try Domain.join d with
        | S.Stop -> ()
-      );
+
+
+  let run self =
+    Gc.finalise stop self;
+    let domain = S.run self.scheduler in
+    self.domain <- Some domain
 
 end
 
@@ -59,7 +61,7 @@ module Main = struct
   let run main =
     let fifo = MainScheduler.create () in
     MainScheduler.push_process fifo (fun () ->
-         main (); raise MainScheduler.Stop);
+        main (); Gc.full_major (); raise MainScheduler.Stop);
     try MainScheduler.run fifo with
     | MainScheduler.Stop -> exit 0
 end

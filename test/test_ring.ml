@@ -25,7 +25,7 @@ and RingMember : sig
   val stop : t -> unit
 end = Actor.Make(Roundrobin)(MessageRing)
 
-type memory = {mutable next : RingMember.t Option.t}
+type memory = {next : RingMember.t Option.t}
 let rec actor_ring_methods =
   let init = fun _ -> { next = None } in
   let mem = Domain.DLS.new_key init in
@@ -44,20 +44,22 @@ let rec actor_ring_methods =
           | Some next -> forward @@ RingMember.send next (Send(n-1))
         end
       | CreateRing(id, size, leader) ->
-        let m = Domain.DLS.get mem in
+        (* let m = Domain.DLS.get mem in *)
         if id >= size then begin
-          m.next <- Some leader;
-          Domain.DLS.set mem m
+          Domain.DLS.set mem {next = Some leader}
         end else begin
           let next = RingMember.create actor_ring_methods in
           RingMember.run next;
-          m.next <- Some next;
-          Domain.DLS.set mem m;
+          (* m.next <- Some next; *)
+          Domain.DLS.set mem {next = Some next};
+          (* Domain.DLS.set mem m; *)
           forward @@ RingMember.send next (CreateRing(id+1, size, leader))
         end
       | Stop(leader) ->
         let m = Domain.DLS.get mem in
         let next = Option.get m.next in
+        (* m.next <- None; *)
+        Domain.DLS.set mem {next = None};
         if next != leader then begin
           forward @@ RingMember.send next (Stop(leader));
           RingMember.stop next
@@ -65,23 +67,21 @@ let rec actor_ring_methods =
   in fun self ->
     {MessageRing.m = fun forward -> ring_methods self forward}
 
-
-let leader = RingMember.create actor_ring_methods
-
 let main _ =
   print_endline "-----TEST RING------";
+  let leader = RingMember.create actor_ring_methods in
   RingMember.run leader;
-  let p = RingMember.send leader (CreateRing(1, 100, leader)) in
+  let p = RingMember.send leader (CreateRing(1, 10, leader)) in
   Promise.await p;
   print_endline "Creation: Done";
 
-  let p' = RingMember.send leader (Send(1_000)) in
+  let p' = RingMember.send leader (Send(10)) in
   Promise.await p';
   print_endline "Cycle: Done";
 
   let p'' = RingMember.send leader (Stop(leader)) in
   Promise.await p'';
-  RingMember.stop leader;
+  (* RingMember.stop leader; *)
   print_endline "Stop: Done";
 
   print_endline "Test passed";

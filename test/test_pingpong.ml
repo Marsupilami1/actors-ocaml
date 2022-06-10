@@ -17,7 +17,6 @@ and Ping : sig
   val create : (t -> MessagePing.method_type) -> t
   val send : t -> 'a MessagePing.t -> 'a Promise.t
   val run : t -> unit
-  val stop : t -> unit
 end = Actor.Make(Roundrobin)(MessagePing)
 
 and MessagePong : sig
@@ -32,7 +31,6 @@ and Pong : sig
   val create : (t -> MessagePong.method_type) -> t
   val send : t -> 'a MessagePong.t -> 'a Promise.t
   val run : t -> unit
-  val stop : t -> unit
 end = Actor.Make(Roundrobin)(MessagePong)
 
 
@@ -78,9 +76,6 @@ let main _ =
   let n = 10 in
   let p = Ping.send ping (Ping(pong, n)) in
   Promise.await p;
-
-  Ping.stop ping;
-  Pong.stop pong;
 
   print_endline "------------------------"
 

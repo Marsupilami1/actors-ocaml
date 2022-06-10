@@ -75,4 +75,10 @@ module Infix : sig
 
   (** Classic bind infix operator flipped. *)
   val (=<<) : ('a -> 'b t) -> 'a t -> 'b t
+
+  (** Monadic [let] for something like [do]-notation. *)
+  val ( let* ) : 'a t -> ('a -> 'b t) -> 'b t
+
+  (** Monadic [and] for [let*] bindings *)
+  val ( and* ) : 'a t -> 'b t -> ('a * 'b) t
 end

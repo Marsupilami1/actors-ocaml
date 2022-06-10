@@ -47,6 +47,16 @@ let test6 () =
   assert (Promise.await q = 42);
   print_endline "Test 6 : Passed"
 
+let test7 () =
+  let p = begin
+    let* x = Promise.pure 40
+    and* y = Promise.pure 2 in
+    Promise.pure @@ x + y
+  end in
+  assert (Promise.await p = 42);
+  print_endline "Test 7 : Passed"
+
+
 
 let main _ =
   print_endline "-----TEST PROMISE-----";
@@ -56,6 +66,7 @@ let main _ =
   test4 ();
   test5 ();
   test6 ();
+  test7 ();
   print_endline "----------------------"
 
 let _ = Actor.Main.run main

@@ -27,8 +27,8 @@ let actor_methods =
     if m.(n) <> None then
       Option.get m.(n)
     else if n < 2 then Promise.pure n else begin
-      let p1 = Promise.join @@ MyActor.send self (Fib (n - 1)) in
-      let p2 = Promise.join @@ MyActor.send self (Fib (n - 2)) in
+      let* p1 = MyActor.send self (Fib (n - 1))
+      and* p2 = MyActor.send self (Fib (n - 2)) in
       let pres = (+) <$> p1 <*> p2 in
       m.(n) <- Some pres;
       pres

@@ -1,4 +1,4 @@
-(* Adapted from the ping pong exemple *)
+(* Adapted from the ping pong example *)
 (* https://stw.gitbooks.io/the-encore-programming-language/content/nutshell.html *)
 open Actorsocaml
 

@@ -64,14 +64,8 @@ let test8 () =
 
 let main _ =
   print_endline "-----TEST PROMISE-----";
-  test1 ();
-  test2 ();
-  test3 ();
-  test4 ();
-  test5 ();
-  test6 ();
-  test7 ();
-  test8 ();
+  test1 (); test2 (); test3 (); test4 ();
+  test5 (); test6 (); test7 (); test8 ();
   print_endline "----------------------"
 
 let _ = Actor.Main.run main

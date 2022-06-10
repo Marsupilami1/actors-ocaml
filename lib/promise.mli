@@ -27,6 +27,10 @@ val create : unit -> 'a t * ('a -> unit)
     directly available. *)
 val pure : 'a -> 'a t
 
+(** [return v] is the same as {!pure} [v], but with
+    another name. *)
+val return : 'a -> 'a t
+
 (** [await p] raise the Effect ({!NotReady} [p])
     if [p] is empty, and return the value if
     [p] is fulfilled. *)
@@ -82,6 +86,12 @@ module Infix : sig
 
   (** Classic bind infix operator flipped. *)
   val (=<<) : ('a -> 'b t) -> 'a t -> 'b t
+
+  (** Applicative [let], acts like {!fmap}. *)
+  val ( let+ ) : 'a t -> ('a -> 'b) -> 'b t
+
+  (** Applicative [and], monoidal product operation. *)
+  val ( and+ ) : 'a t -> 'b t -> ('a * 'b) t
 
   (** Monadic [let] for something like [do]-notation. *)
   val ( let* ) : 'a t -> ('a -> 'b t) -> 'b t

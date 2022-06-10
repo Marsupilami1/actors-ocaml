@@ -98,6 +98,8 @@ let fmap f p =
 
 let pure v = Atomic.make (Filled v)
 
+let return = pure
+
 let join pp =
   let (res, fill) = create () in
   add_callback pp (fun p -> add_callback p (fun v -> fill v));
@@ -129,6 +131,9 @@ module Infix = struct
   let (>>=) = bind
   let (=<<) f m = m >>= f
 
+  let ( let+ ) p f = f <$> p
+  let ( and+ ) x y = (fun x y -> (x, y)) <$> x <*> y
+
   let ( let* ) = (>>=)
-  let ( and* ) x y = (fun x y -> (x, y)) <$> x <*> y
+  let ( and* ) = ( and+ )
 end

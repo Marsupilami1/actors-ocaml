@@ -118,6 +118,7 @@ Trying to fill in the same promise twice raises a `Promise__Multiple_Write` erro
 #### Reading
 
 You can get the value of a promise with `await`. It will throw the effect `NotReady p` if the value is not available, so it can then be handled by a scheduler (That's why the call to `Actor.Main.run` is mandatory).
+You can also use `get`, which is blocking.
 
 Of course, the value will be returned if it is available.
 

@@ -36,6 +36,10 @@ val return : 'a -> 'a t
     [p] is fulfilled. *)
 val await : 'a t -> 'a
 
+(** [get p] blocks until the result of [p] is available
+    and returns it. *)
+val get : 'a t -> 'a
+
 (** [is_ready p] checks if the value of [p] is available. *)
 val is_ready : 'a t -> bool
 

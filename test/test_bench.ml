@@ -20,16 +20,14 @@ let actor_methods =
   in
   fun self -> {MyMessage.m = fun forward -> methods self forward}
 
-let actor = MyActor.create actor_methods
 
 let main _ =
   print_endline "-----TEST BENCH-----";
 
+  let actor = MyActor.create actor_methods in
   let message = MyMessage.Pass () in
-  MyActor.run actor;
   ignore @@ MyActor.send actor message;
   Unix.sleep 1;
-  MyActor.stop actor;
   print_endline "Test passed";
   print_endline "--------------------"
 

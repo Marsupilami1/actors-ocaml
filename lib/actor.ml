@@ -6,11 +6,26 @@ module Make(S : Scheduler.S)(M : Message.S) = struct
     mutable domain : unit Domain.t Option.t
   }
 
-  let create methods = {
+  let stop self =
+    match self.domain with
+    | None -> failwith "Cannot stop non-running actor";
+    | Some d ->
+      S.stop self.scheduler;
+      self.domain <- None;
+      try Domain.join d with
+       | S.Stop -> ()
+
+  let run self =
+    Gc.finalise stop self;
+    let domain = S.run self.scheduler in
+    self.domain <- Some domain
+
+  let create methods =
+    let a = {
     scheduler = S.create ();
     methods = methods;
     domain = None
-  }
+  } in run a; a
 
   let send self message =
     let (p, fill) = Promise.create () in
@@ -21,23 +36,6 @@ module Make(S : Scheduler.S)(M : Message.S) = struct
 
   let wait_for condition =
     S.wait_for condition
-
-
-  let stop self =
-    match self.domain with
-    | None -> failwith "Cannot stop non-running actor";
-    | Some d ->
-      S.stop self.scheduler;
-      self.domain <- None;
-      try Domain.join d with
-       | S.Stop -> ()
-
-
-  let run self =
-    Gc.finalise stop self;
-    let domain = S.run self.scheduler in
-    self.domain <- Some domain
-
 end
 
 

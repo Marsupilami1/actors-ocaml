@@ -15,12 +15,6 @@ module Make (S : Scheduler.S) (M : Message.S) : sig
       condition inside the current actor (In which the 
       method is defined). *)
   val wait_for : (unit -> bool) -> unit
-
-  (** [run actor] starts the scheduler of [actor] *)
-  val run : t -> unit
-
-  (** [stop actor] stops the actor [actor] *)
-  val stop : t -> unit
 end
 
 (** The [Main] Actor, which runs the [main] function. *)

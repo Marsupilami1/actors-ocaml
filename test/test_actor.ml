@@ -49,7 +49,6 @@ let main _ =
   print_endline "-----TEST ACTOR-----";
 
   let actor = MyActor.create actor_methods in
-  MyActor.run actor;
 
   let n = 42 in
   let p = Promise.join @@ MyActor.send actor (Fib n) in

@@ -16,7 +16,6 @@ and Ping : sig
   type t
   val create : (t -> MessagePing.method_type) -> t
   val send : t -> 'a MessagePing.t -> 'a Promise.t
-  val run : t -> unit
 end = Actor.Make(Roundrobin)(MessagePing)
 
 and MessagePong : sig
@@ -30,7 +29,6 @@ and Pong : sig
   type t
   val create : (t -> MessagePong.method_type) -> t
   val send : t -> 'a MessagePong.t -> 'a Promise.t
-  val run : t -> unit
 end = Actor.Make(Roundrobin)(MessagePong)
 
 
@@ -69,8 +67,6 @@ let main _ =
 
   let ping = Ping.create actor_ping_methods in
   let pong = Pong.create actor_pong_methods in
-  Ping.run ping;
-  Pong.run pong;
 
   (* TODO: solve deadlock issue *)
   let n = 10 in

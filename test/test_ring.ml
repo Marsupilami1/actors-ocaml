@@ -21,8 +21,6 @@ and RingMember : sig
   type t
   val create : (t -> MessageRing.method_type) -> t
   val send : t -> 'a MessageRing.t -> 'a Promise.t
-  val run : t -> unit
-  val stop : t -> unit
 end = Actor.Make(Roundrobin)(MessageRing)
 
 type memory = {next : RingMember.t Option.t}
@@ -49,7 +47,6 @@ let rec actor_ring_methods =
           Domain.DLS.set mem {next = Some leader}
         end else begin
           let next = RingMember.create actor_ring_methods in
-          RingMember.run next;
           (* m.next <- Some next; *)
           Domain.DLS.set mem {next = Some next};
           (* Domain.DLS.set mem m; *)
@@ -61,8 +58,7 @@ let rec actor_ring_methods =
         (* m.next <- None; *)
         Domain.DLS.set mem {next = None};
         if next != leader then begin
-          forward @@ RingMember.send next (Stop(leader));
-          RingMember.stop next
+          forward @@ RingMember.send next (Stop(leader))
         end
   in fun self ->
     {MessageRing.m = fun forward -> ring_methods self forward}
@@ -71,7 +67,6 @@ let main _ =
   print_endline "-----TEST RING------";
   let _ =
     let leader = RingMember.create actor_ring_methods in
-    RingMember.run leader;
     let p = RingMember.send leader (CreateRing(1, 10, leader)) in
     Promise.await p;
     print_endline "Creation: Done";

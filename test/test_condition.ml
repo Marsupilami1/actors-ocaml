@@ -34,7 +34,6 @@ let actor_methods =
 let main _ =
   print_endline "-----TEST Condition-----";
   let actor = MyActor.create actor_methods in
-  MyActor.run actor;
 
   let pw = MyActor.send actor Wait in
   let _ = MyActor.send actor (Set 41) in

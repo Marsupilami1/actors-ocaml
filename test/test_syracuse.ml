@@ -31,7 +31,6 @@ let actor_methods =
 let main _ =
   print_endline "-----TEST SYRACUSE-----";
   let actor = MyActor.create actor_methods in
-  MyActor.run actor;
 
   let n = 989345275647 in
   let p = Promise.join @@ MyActor.send actor (Syracuse n) in

@@ -68,7 +68,7 @@ The main function could look like:
 
 ``` ocaml
 let main _ =
-  MyActor.run actor;
+  let actor = MyActor.create actor_methods in
   let n = 6 in
   let p = MyActor.send actor (Fib n) in
   Printf.printf "fib(%d) = %d\n" n @@ Promise.await p
@@ -146,8 +146,7 @@ To create an actor, you only need to specify its methods.
 A method is a function which takes an actor (`self`) and a message.
 
 #### Execution
-To run an actor, just call the `run` function on it.
-It will spawn a new thread and run the scheduler.
+Actors runs when they are created: it will spawn a new thread and run the scheduler.
 
 Actors are stopped automatically thanks to a hook on the garbarge collector.
 
@@ -184,7 +183,6 @@ let actor_methods =
 
 let main _ =
   let actor = MyActor.create actor_methods in
-  MyActor.run actor;
 
   let n = 42 in
   let p = Promise.join @@ MyActor.send actor (Syracuse n) in

@@ -45,7 +45,7 @@ let actor_methods =
 in fun self -> {MyMessage.m = fun forward -> methods self forward}
 
 
-let main _ =
+let test _ =
   print_endline "-----TEST ACTOR-----";
 
   let actor = MyActor.create actor_methods in
@@ -53,6 +53,7 @@ let main _ =
   let n = 42 in
   let p = Promise.join @@ MyActor.send actor (Fib n) in
   assert (267914296 = Promise.await p);
+  Alcotest.(check int) "same int" 267914296 (Promise.await p);
 
   (* let n' = 5_000_000 in *)
   (* let p' = Promise.join @@ MyActor.send actor (ToZero n') in *)
@@ -66,4 +67,4 @@ let main _ =
   print_endline "--------------------"
 
 
-let _ = Actor.Main.run main
+(* let _ = Actor.Main.run main *)

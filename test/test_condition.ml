@@ -19,28 +19,23 @@ let actor_methods =
       -> a
     = fun _ _ -> function
       | Set n ->
-        Printf.printf "Set n to %d\n%!" n;
+        (* set mem to n *)
         Domain.DLS.set mem n
       | Wait ->
-        print_endline "Wait for n = 42";
+        (* wait for n = 42 *)
         MyActor.wait_for (fun _ ->
             42 = Domain.DLS.get mem
           );
-        print_endline "n is now 42"
+        (* n is now 42 *)
+        Alcotest.(check int) "same int" 42 (Domain.DLS.get mem)
   in
   fun self -> {MyMessage.m = fun f -> methods self f}
 
 
-let main _ =
-  print_endline "-----TEST Condition-----";
+let test _ =
   let actor = MyActor.create actor_methods in
 
   let pw = MyActor.send actor Wait in
   let _ = MyActor.send actor (Set 41) in
   let _ = MyActor.send actor (Set 42) in
   Promise.await pw;
-
-  print_endline "Test passed";
-  print_endline "--------------------"
-
-let _ = Actor.Main.run main

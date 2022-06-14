@@ -1,0 +1,14 @@
+(executable
+ (libraries actorsocaml)
+ (name exple_pingpong)
+ (modules exple_pingpong))
+
+(executable
+ (libraries actorsocaml)
+ (name exple_ring)
+ (modules exple_ring))
+
+(executable
+ (libraries actorsocaml)
+ (name exple_syracuse)
+ (modules exple_syracuse))

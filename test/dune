@@ -4,7 +4,7 @@
  (modules test_actor))
 
 (test
- (libraries actorsocaml)
+ (libraries actorsocaml alcotest)
  (name test_promise)
  (modules test_promise))
 

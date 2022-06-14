@@ -68,7 +68,6 @@ let main _ =
   let ping = Ping.create actor_ping_methods in
   let pong = Pong.create actor_pong_methods in
 
-  (* TODO: solve deadlock issue *)
   let n = 10 in
   let p = Ping.send ping (Ping(pong, n)) in
   Promise.await p;

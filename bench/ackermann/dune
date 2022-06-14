@@ -1,0 +1,14 @@
+(executable
+ (libraries actorsocaml benchmark)
+ (name bench_ackermann_await)
+ (modules bench_ackermann_await))
+
+(executable
+ (libraries actorsocaml benchmark)
+ (name bench_ackermann_forward)
+ (modules bench_ackermann_forward))
+
+(executable
+ (libraries actorsocaml benchmark)
+ (name bench_ackermann_lifted)
+ (modules bench_ackermann_lifted))

@@ -117,7 +117,6 @@ let bind m f =
 
 
 type _ Effect.t += Async : (unit -> unit) -> unit Effect.t
-
 let async f =
   let (p, fill) = create () in
   perform (Async (fun _ -> fill @@ f ()));

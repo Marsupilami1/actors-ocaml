@@ -1,0 +1,4 @@
+(executable
+ (libraries actorsocaml benchmark)
+ (name bench_fact)
+ (modules bench_fact))

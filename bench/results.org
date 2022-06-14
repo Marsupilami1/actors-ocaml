@@ -1,0 +1,61 @@
+#+title: Bench results
+
+* Ackerman
+Note that actor creation is not part of the bench.
+** Await: 5.23/s
+Latencies for 100 iterations of "Ackerman(3, 4), await":
+Ackerman(3, 4), await: 19.22 WALL (18.92 usr +  0.21 sys = 19.12 CPU) @  5.23/s (n=100)
+                        Rate Ackerman(3, 4), await
+Ackerman(3, 4), await 5.23/s                    --
+
+** Forward: 12.1/s
+Latencies for 100 iterations of "Ackerman(3, 4), forward":
+Ackerman(3, 4), forward:  8.25 WALL ( 8.12 usr +  0.14 sys =  8.26 CPU) @ 12.10/s (n=100)
+                          Rate Ackerman(3, 4), forward
+Ackerman(3, 4), forward 12.1/s                      --
+
+** Forward + lifted promise 306/s
+Latencies for 1000 iterations of "Ackerman(3, 4), lifted":
+Ackerman(3, 4), lifted:  1.62 WALL ( 3.26 usr +  0.01 sys =  3.27 CPU) @ 305.84/s (n=1000)
+                        Rate Ackerman(3, 4), lifted
+Ackerman(3, 4), lifted 306/s                     --
+
+* Factorial
+** Tail recursive (100_000)
+Latencies for 10000 iterations of "fact term fut":
+fact term fut:  1.29 WALL ( 1.29 usr +  0.00 sys =  1.29 CPU) @ 7781.55/s (n=10000)
+                Rate fact term fut
+fact term fut 7782/s            --
+
+** Basic with async (10_000)
+Latencies for 10000 iterations of "fact basic fut":
+fact basic fut:  0.91 WALL ( 0.91 usr +  0.00 sys =  0.91 CPU) @ 10957.88/s (n=10000)
+                  Rate fact basic fut
+fact basic fut 10958/s             --
+
+** Basic with monadic let (10_000)
+Latencies for 10000 iterations of "fact basic futm":
+fact basic futm:  4.70 WALL ( 4.70 usr +  0.00 sys =  4.70 CPU) @ 2128.03/s (n=10000)
+                  Rate fact basic futm
+fact basic futm 2128/s              --
+
+** Basic with fmap (10_000)
+Latencies for 10000 iterations of "fact fmap fut":
+fact fmap fut:  2.01 WALL ( 2.01 usr +  0.00 sys =  2.01 CPU) @ 4986.55/s (n=10000)
+                Rate fact fmap fut
+fact fmap fut 4987/s            --
+
+* Linked list
+System time is significant here.
+Can not allocate more than 127 Domains (so max 128 with the main domain).
+** 110 nodes, Basic
+Latencies for 1000 iterations of "Linked list":
+Linked list:  2.48 WALL ( 0.98 usr +  2.07 sys =  3.05 CPU) @ 328.10/s (n=1000)
+             Rate Linked list
+Linked list 328/s          --
+
+** 110 nodes, Tail recursive
+Latencies for 1000 iterations of "Linked list":
+Linked list:  0.91 WALL ( 0.51 usr +  0.64 sys =  1.15 CPU) @ 869.99/s (n=1000)
+             Rate Linked list
+Linked list 870/s          --

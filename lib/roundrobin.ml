@@ -27,6 +27,9 @@ type _ Effect.t += WaitFor : (unit -> bool) -> unit Effect.t
 let wait_for condition =
   perform @@ WaitFor condition
 
+type _ Effect.t += Yield : unit Effect.t
+let yield () =
+  perform @@ Yield
 
 let rec loop fifo =
   match_with manage_next_process fifo {

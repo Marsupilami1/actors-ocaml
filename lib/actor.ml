@@ -36,6 +36,9 @@ module Make(S : Scheduler.S)(M : Message.S) = struct
 
   let wait_for condition =
     S.wait_for condition
+
+  let yield () =
+    S.yield ()
 end
 
 

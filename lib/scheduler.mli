@@ -24,6 +24,9 @@ module type S = sig
       to be [true]. *)
   val wait_for : (unit -> bool) -> unit
 
+  (** [yield ()] pushes the current process back to the queue. *)
+  val yield : unit -> unit
+
   (** [run s] runs the scheduler in a new domain. *)
   val run : t -> unit Domain.t
 

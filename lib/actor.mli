@@ -15,6 +15,9 @@ module Make (S : Scheduler.S) (M : Message.S) : sig
       condition inside the current actor (In which the 
       method is defined). *)
   val wait_for : (unit -> bool) -> unit
+
+  (** [yield ()] pushes the current process back to the queue. *)
+  val yield : unit -> unit
 end
 
 (** The [Main] Actor, which runs the [main] function. *)

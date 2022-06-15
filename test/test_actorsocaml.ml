@@ -11,6 +11,7 @@ let main _ =
       test_case "join"        `Quick Test_promise.test_join;
       test_case "unify"       `Quick Test_promise.test_unify;
       test_case "ring unify"  `Quick Test_promise.test_ring_unify;
+      test_case "huge unify"  `Quick Test_promise.test_huge_unify;
       test_case "let"         `Quick Test_promise.test_let;
       test_case "async"       `Quick Test_promise.test_async;
     ];

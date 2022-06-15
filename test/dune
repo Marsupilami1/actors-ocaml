@@ -1,3 +1,12 @@
 (test
  (libraries actorsocaml alcotest)
- (name test_actorsocaml))
+ (name test_actorsocaml)
+ (modules test_actorsocaml
+          test_condition
+          test_actor test_promise))
+
+(test
+ (libraries actorsocaml actorsocamlppx)
+ (name test_object)
+ (preprocess (pps actorsocamlppx))
+ (modules test_object))

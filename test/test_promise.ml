@@ -57,6 +57,35 @@ let test_ring_unify () =
   Alcotest.(check int) "same int" 42 @@ Promise.await q;
   Alcotest.(check int) "same int" 42 @@ Promise.await p
 
+(*  for n = 8: *)
+(* O <- filled *)
+(* +----O      *)
+(* O    +-O    *)
+(* +-O  O |    *)
+(* O |  | O    *)
+(* | O  O-+    *)
+(* O-+    O    *)
+(*   O----+    *)
+(*        O    *)
+let test_huge_unify () =
+  let n = 128 in
+  let t = Array.init n (fun _ -> Promise.create ()) in
+  let t' = Array.init n (fun _ -> Promise.create ()) in
+  for i=1 to (n/2 - 1) do
+    Promise.unify (fst t.(i)) (fst (t.(2 * i)));
+    Promise.unify (fst t.(i)) (fst (t.(2 * i + 1)));
+    Promise.unify (fst t'.(i)) (fst (t'.(2 * i)));
+    Promise.unify (fst t'.(i)) (fst (t'.(2 * i + 1)));
+  done;
+  for i=(n/2) to (n-1) do
+    Promise.unify (fst t.(i)) (fst (t'.(i)));
+  done;
+  (snd t.(1)) 42;
+  for i=1 to (n-1) do
+    Alcotest.(check int) "same int" 42 @@ Promise.await (fst t.(i));
+    Alcotest.(check int) "same int" 42 @@ Promise.await (fst t'.(i));
+  done
+
 let test_let () =
   let p = begin
     let* x = Promise.pure 40

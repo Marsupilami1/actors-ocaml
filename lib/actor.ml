@@ -58,7 +58,7 @@ module Main = struct
 
   let run main =
     MainScheduler.push_process fifo (fun () ->
-        main (); Gc.full_major (); raise MainScheduler.Stop);
+        main (); raise MainScheduler.Stop);
     try MainScheduler.run fifo with
     | MainScheduler.Stop -> exit 0
 end

@@ -48,6 +48,15 @@ let test_unify () =
   Alcotest.(check int) "same int" 42 (Promise.await q);
   print_endline "Test 6 : Passed"
 
+let test_ring_unify () =
+  let p, fillp = Promise.create () in
+  let q, _ = Promise.create () in
+  Promise.unify p q;
+  Promise.unify q p;
+  fillp 42;
+  Alcotest.(check int) "same int" 42 @@ Promise.await q;
+  Alcotest.(check int) "same int" 42 @@ Promise.await p
+
 let test_let () =
   let p = begin
     let* x = Promise.pure 40

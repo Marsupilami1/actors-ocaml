@@ -3,29 +3,18 @@ module Make(S : Scheduler.S)(M : Message.S) = struct
   type t = {
     scheduler : S.t;
     methods : t -> M.method_type;
-    mutable domain : unit Domain.t Option.t
   }
 
   let stop self =
-    match self.domain with
-    | None -> failwith "Cannot stop non-running actor";
-    | Some d ->
-      S.stop self.scheduler;
-      self.domain <- None;
-      try Domain.join d with
-       | S.Stop -> ()
-
-  let run self =
-    Gc.finalise stop self;
-    let domain = S.run self.scheduler in
-    self.domain <- Some domain
+    S.stop self.scheduler
 
   let create methods =
     let a = {
-    scheduler = S.create ();
-    methods = methods;
-    domain = None
-  } in run a; a
+      scheduler = S.create ();
+      methods = methods;
+    } in
+    Gc.finalise stop a;
+    a
 
   let send self message =
     let (p, fill) = Promise.create () in
@@ -48,17 +37,73 @@ module Main = struct
     type method_type = { m : 'a . ('a Promise.t -> 'a) -> 'a t -> 'a }
   end
   module MainScheduler = struct
-    include Roundrobin
-    let run fifo = loop fifo; exit 0
+    open Effect
+    open Effect.Deep
+    exception Stop
+    exception Interrupt
+    type process = unit -> unit
+    type t = {processes : process Domainslib.Chan.t;}
+    let push_process fifo process =
+      Domainslib.Chan.send fifo.processes process
+    let get_process fifo =
+      Domainslib.Chan.recv fifo.processes
+    let manage_next_process fifo =
+      get_process fifo ()
+    type _ Effect.t += WaitFor : (unit -> bool) -> unit Effect.t
+    let wait_for condition =
+      perform @@ WaitFor condition
+    type _ Effect.t += Yield : unit Effect.t
+    let yield () =
+      perform @@ Yield
+    let rec loop fifo =
+      match_with manage_next_process fifo {
+        retc = (fun _ -> loop fifo);
+        exnc = (fun e -> match e with
+            | Interrupt -> loop fifo
+            | _ -> raise e
+          );
+        effc = fun (type a) (e : a Effect.t) ->
+          match e with
+          | Promise.NotReady p -> Some (
+              fun (k : (a, _) continuation) ->
+                (* The process is waiting for the promise to be filled *)
+                (* So we add a callback to this promise to push the process *)
+                (* back to the queue *)
+                Promise.add_callback p (fun v ->
+                    push_process fifo (fun _ -> continue k v));
+                loop fifo;
+            )
+          | Promise.Async f -> Some (
+              fun (k : (a, _) continuation) ->
+                push_process fifo f;
+                continue k ()
+            )
+          | WaitFor condition -> Some (
+              fun (k : (a, _) continuation) ->
+                if condition () then
+                  continue k ()
+                else (
+                  push_process fifo (fun _ ->
+                      wait_for condition; continue k ());
+                  loop fifo
+                )
+            )
+          | _ -> None
+      }
+    let create () ={
+        processes = Domainslib.Chan.make_unbounded ();
+      }
+    let stop fifo =
+      push_process fifo (fun _ -> Gc.full_major (); raise Stop);
   end
 
   include Make(MainScheduler)(MainMessage)
 
-  let fifo = MainScheduler.create ()
-
   let run main =
-    MainScheduler.push_process fifo (fun () ->
-        main (); raise MainScheduler.Stop);
-    try MainScheduler.run fifo with
-    | MainScheduler.Stop -> exit 0
+    let fifo = MainScheduler.create () in
+    MainScheduler.push_process fifo (fun _ ->
+        main (); MainScheduler.stop fifo);
+    try MainScheduler.loop fifo with
+    | MainScheduler.Stop -> ()
+
 end

@@ -7,7 +7,7 @@ module MyMessage = struct
   type method_type = { m : 'a . ('a Promise.t -> 'a) -> 'a t -> 'a }
 end
 
-module MyActor = Actor.Make(Roundrobin)(MyMessage)
+module MyActor = Actor.Make(Multiroundrobin)(MyMessage)
 
 type memory = {
   mutable state : int; mutable next : MyActor.t option
@@ -46,7 +46,7 @@ let rec generate n =
     MyActor.create (actor_methods n (Some (generate (n - 1))))
 
 let main _ =
-  let n = 110 in
+  let n = 1000 in
   let r = 1000 in
   let nodes = generate n in
   let f () = Promise.await @@ MyActor.send nodes (SumTerm 0) in

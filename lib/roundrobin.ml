@@ -5,11 +5,11 @@ exception Stop
 exception Interrupt
 
 type process = unit -> unit
-type t = { processes : process Domainslib.Chan.t }
-
-let create () = {
-  processes = Domainslib.Chan.make_unbounded ()
+type t = {
+  processes : process Domainslib.Chan.t;
+  mutable domain : unit Domain.t Option.t
 }
+
 
 let push_process fifo process =
   Domainslib.Chan.send fifo.processes process
@@ -67,9 +67,17 @@ let rec loop fifo =
       | _ -> None
   }
 
-let run fifo = Domain.spawn (fun _ ->
-    loop fifo
-  )
-
 let stop fifo =
   push_process fifo (fun _ -> Gc.full_major (); raise Stop);
+  try Domain.join (Option.get fifo.domain) with
+  | Stop -> ();
+  fifo.domain <- None
+
+let create () =
+  let a = {
+    processes = Domainslib.Chan.make_unbounded ();
+    domain = None
+  } in
+  let d = Domain.spawn (fun _ -> loop a) in
+  a.domain <- Some d;
+  a

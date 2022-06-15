@@ -27,9 +27,6 @@ module type S = sig
   (** [yield ()] pushes the current process back to the queue. *)
   val yield : unit -> unit
 
-  (** [run s] runs the scheduler in a new domain. *)
-  val run : t -> unit Domain.t
-
   (** [stop s] stops the scheduler and raises {!Stop}. *)
   val stop : t -> unit
 end

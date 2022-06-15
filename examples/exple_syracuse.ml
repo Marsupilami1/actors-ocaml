@@ -29,14 +29,10 @@ let actor_methods =
 
 
 let main _ =
-  print_endline "-----TEST SYRACUSE-----";
   let actor = MyActor.create actor_methods in
 
   let n = 989345275647 in
   let p = Promise.join @@ MyActor.send actor (Syracuse n) in
-  assert (1 = Promise.await p);
-
-  print_endline "Test passed";
-  print_endline "-----------------------"
+  assert (1 = Promise.await p)
 
 let _ = Actor.Main.run main

@@ -48,14 +48,14 @@ fact fmap fut 4987/s            --
 * Linked list
 System time is significant here.
 Can not allocate more than 127 Domains (so max 128 with the main domain).
-** 110 nodes, Basic
+** 1000 nodes, Basic
 Latencies for 1000 iterations of "Linked list":
-Linked list:  2.48 WALL ( 0.98 usr +  2.07 sys =  3.05 CPU) @ 328.10/s (n=1000)
-             Rate Linked list
-Linked list 328/s          --
+Linked list: 21.78 WALL (43.55 usr +  4.25 sys = 47.80 CPU) @ 20.92/s (n=1000)
+              Rate Linked list
+Linked list 20.9/s          --
 
-** 110 nodes, Tail recursive
+** 1000 nodes, Tail recursive
 Latencies for 1000 iterations of "Linked list":
-Linked list:  0.91 WALL ( 0.51 usr +  0.64 sys =  1.15 CPU) @ 869.99/s (n=1000)
-             Rate Linked list
-Linked list 870/s          --
+Linked list:  2.74 WALL (11.03 usr +  1.79 sys = 12.83 CPU) @ 77.97/s (n=1000)
+              Rate Linked list
+Linked list 78.0/s          --

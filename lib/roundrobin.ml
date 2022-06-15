@@ -72,4 +72,4 @@ let run fifo = Domain.spawn (fun _ ->
   )
 
 let stop fifo =
-  push_process fifo (fun _ -> raise Stop);
+  push_process fifo (fun _ -> Gc.full_major (); raise Stop);

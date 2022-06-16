@@ -27,9 +27,9 @@ let exp_to_string = function
   | { pexp_desc = Pexp_construct ({ txt = Longident.Lident s; _ }, None); _ }
     when String.length s > 0 && s.[0] >= 'A' && s.[0] <= 'Z' -> "_" ^ s
   | { pexp_loc; _ } ->
-      raise_errorf
-        ~loc:pexp_loc
-        "Actors methods or attributes can only be simple identifiers."
+    raise_errorf
+      ~loc:pexp_loc
+      "Actors methods or attributes can only be simple identifiers."
 
 
 let transform =
@@ -49,7 +49,7 @@ let transform =
         | [%expr [%actor [%e? {pexp_desc = Pexp_object _class_construct; _} as e]]] ->
           let loc = e.pexp_loc in
           [%expr
-             let a = Oactor.create [%e e] in a
+            let a = Oactor.create [%e e] in a
           ]
         | { pexp_desc =
               Pexp_apply (([%expr [%e? obj] #! [%e? meth]] as prop), _args)
@@ -57,16 +57,25 @@ let transform =
           } as r ->
           let meth_name = exp_to_string meth in
           let loc = prop.pexp_loc in
-          let application = { r with pexp_desc =
+          let application = {
+            r with
+            pexp_desc =
               Pexp_apply (
-              { prop with
-                pexp_desc =
-                  Pexp_send ([%expr [%e obj].methods], make_str ~loc:meth.pexp_loc meth_name)
-              }, _args
-            )
+                { prop with
+                  pexp_desc =
+                    Pexp_send (
+                      [%expr [%e obj].methods],
+                      make_str ~loc:meth.pexp_loc meth_name
+                    )
+                }, _args
+              )
           } in
           let loc = prop.pexp_loc in
-          [%expr Promise.async (fun _ -> [%e application])]
+          [%expr
+            let (p, fill) = Promise.create () in
+            Roundrobin.push_process [%e obj].scheduler (fun _ -> fill [%e application]);
+            p
+          ]
         | _ -> super#expression expr
       in
       default_loc := prev_default_loc;

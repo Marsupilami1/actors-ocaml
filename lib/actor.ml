@@ -103,7 +103,8 @@ module Main = struct
     let fifo = MainScheduler.create () in
     MainScheduler.push_process fifo (fun _ ->
         main (); MainScheduler.stop fifo);
-    try MainScheduler.loop fifo with
-    | MainScheduler.Stop -> ()
+    (try MainScheduler.loop fifo with
+     | MainScheduler.Stop -> ());
+    Multiroundrobin.stop_all ()
 
 end

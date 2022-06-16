@@ -46,10 +46,10 @@ let rec generate n =
     MyActor.create (actor_methods n (Some (generate (n - 1))))
 
 let main _ =
-  let n = 1000 in
-  let r = 1000 in
+  let n = 10000 in
+  let r = 100 in
   let nodes = generate n in
-  let f () = Promise.await @@ MyActor.send nodes (SumTerm 0) in
+  let f () = Promise.await @@ MyActor.send nodes Sum in
   let samples = Benchmark.latency1 ~name: "Linked list" (Int64.of_int r) f () in
   Benchmark.tabulate samples
 

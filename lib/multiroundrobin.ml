@@ -5,7 +5,7 @@ exception Stop
 exception Interrupt
 
 let spawned_actors = ref 0
-let max_domains = 127
+let max_domains = 7 (* for 8 cores hardware *)
 
 type process = unit -> unit
 
@@ -81,8 +81,24 @@ let rec loop id =
       | _ -> None
   }
 
-let stop id =
-  push_process id (fun _ -> Gc.full_major (); raise Stop)
+let stop _id = ()
+
+let stop_all () =
+  for id = 0 to max_domains - 1 do
+    if domains.(id) <> None then  begin
+      (* Clear the process queue *)
+      while Domainslib.Chan.recv_poll (get_fifo id) <> None do
+        ()
+      done;
+      (* Stop the thread *)
+      push_process id (fun _ -> raise Stop);
+      try Domain.join (Option.get (get_domain_info id).domain) with
+      | Stop -> ()
+    end
+  done
+
+
+
 
 let create () =
   let id = !spawned_actors in
@@ -90,7 +106,7 @@ let create () =
     domains.(id) <- Some {
         fifo = Domainslib.Chan.make_unbounded ();
         domain = None;
-        running_actors_count = 1
+        running_actors_count = 1;
       };
     let d = Domain.spawn (fun _ -> loop id) in
     (get_domain_info id).domain <- Some d;

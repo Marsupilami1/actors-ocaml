@@ -39,20 +39,21 @@ let transform =
     method! expression expr =
       let prev_default_loc = !default_loc in
       default_loc := expr.pexp_loc;
-      let { pexp_attributes; _ } = expr in
+      (* let { pexp_attributes; _ } = expr in *)
       let new_expr =
         match expr with
-        | [%expr [%e? r] + [%e? _]] ->
-          self#expression {r with pexp_attributes}
-        | [%expr [%actor [%e? _] + [%e? r]]] ->
-          self#expression {r with pexp_attributes}
+        (* object%actor ... end *)
         | [%expr [%actor [%e? {pexp_desc = Pexp_object _class_construct; _} as e]]] ->
           let loc = e.pexp_loc in
           [%expr
-            let a = Oactor.create [%e e] in a
+            let a = Oactor.create [%e self#expression e] in a
           ]
+        (* object#!method args *)
         | { pexp_desc =
-              Pexp_apply (([%expr [%e? obj] #! [%e? meth]] as prop), _args)
+              Pexp_apply (
+                ([%expr [%e? obj] #! [%e? meth]] as prop),
+                _args
+              )
           ; _
           } as r ->
           let meth_name = exp_to_string meth in
@@ -73,7 +74,8 @@ let transform =
           let loc = prop.pexp_loc in
           [%expr
             let (p, fill) = Promise.create () in
-            Roundrobin.push_process [%e obj].scheduler (fun _ -> fill [%e application]);
+            Roundrobin.push_process [%e obj].Oactor.scheduler
+              (fun _ -> fill [%e application]);
             p
           ]
         | _ -> super#expression expr

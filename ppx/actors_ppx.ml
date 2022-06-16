@@ -43,16 +43,43 @@ let transform =
       let new_expr =
         match expr with
         (* object%actor ... end *)
-        | [%expr [%actor [%e? {pexp_desc = Pexp_object _class_construct; _} as e]]] ->
+        | [%expr [%actor [%e? {pexp_desc = Pexp_object class_struct; _} as e]]] ->
+          let f x =
+            match x.pcf_desc with
+            | Pcf_val (name, _, _) -> Printf.printf "found: %s\n%!" name.txt
+            | _ -> ()
+          in
+          List.iter f @@ class_struct.pcstr_fields;
+          begin
+            match class_struct.pcstr_self.ppat_desc with
+            | Ppat_var _ -> () (* object (self) ... end *)
+            | Ppat_any -> () (* object ... end *)
+            | _ -> ();
+          end;
           let loc = e.pexp_loc in
           [%expr
             let a = Oactor.create [%e self#expression e] in a
           ]
+
+        (* object#!method *)
+        | [%expr [%e? obj] #! [%e? meth]] as expr ->
+          let loc = expr.pexp_loc in
+          let application = {
+            expr with
+            pexp_desc = Pexp_send([%expr [%e obj].Oactor.methods], make_str @@ exp_to_string meth)
+          } in
+          [%expr
+            let p, fill = Promise.create () in
+            Roundrobin.push_process [%e obj].Oactor.scheduler
+              (fun _ -> fill [%e application]);
+            p
+          ]
+
         (* object#!method args *)
         | { pexp_desc =
               Pexp_apply (
                 ([%expr [%e? obj] #! [%e? meth]] as prop),
-                _args
+                args
               )
           ; _
           } as r ->
@@ -68,7 +95,7 @@ let transform =
                       [%expr [%e obj].methods],
                       make_str ~loc:meth.pexp_loc meth_name
                     )
-                }, _args
+                }, args
               )
           } in
           let loc = prop.pexp_loc in

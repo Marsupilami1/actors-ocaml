@@ -225,7 +225,7 @@ let transform =
             (List.map (field_of_desc ~loc:loc) @@ lambda_lift self_name val_fields meth_fields)
           in
           [%expr
-            Oactor.create (fun [%p {
+            Actorsocaml.Oactor.create (fun [%p {
                 ppat_desc = Ppat_var (make_str self_name);
                 ppat_loc = loc;
                 ppat_attributes = [];

@@ -37,6 +37,82 @@ let rec cat_maybes l =
   | Some(x)::xs -> x :: cat_maybes xs
   | None::xs -> cat_maybes xs
 
+let map_maybes f l =
+  cat_maybes (List.map f l)
+
+let get_val_fields fields =
+  let get_val x =
+    match x.pcf_desc with
+    | Pcf_val (name, _, Cfk_concrete(_, e)) -> Some (name, e)
+    | _ -> None
+  in
+  map_maybes get_val fields
+
+let add_DLS val_fields field =
+  let new_desc = begin
+    match field.pcf_desc with
+    | Pcf_val _ -> None
+    | Pcf_method(label, flag, Cfk_concrete(override, exp)) -> begin
+        let wrap_expression, exp =
+          match exp.pexp_desc with
+          | Pexp_poly(e, ty) ->
+            let f e = {exp with pexp_desc = Pexp_poly(e, ty)} in (f, e)
+          | _ -> (Fun.id, exp)
+        in
+        let loc = exp.pexp_loc in
+
+        let add_val_binding e field =
+          let pattern = {
+            ppat_desc = Ppat_var (fst field);
+            ppat_loc = loc;
+            ppat_loc_stack = exp.pexp_loc_stack;
+            ppat_attributes = exp.pexp_attributes;
+          }
+          in [%expr let [%p pattern] = Domain.DLS.get
+                        [%e {e with
+                             pexp_desc = Pexp_ident ({
+                                 txt = Lident (Printf.sprintf "$actor_%s" (fst field).txt);
+                                 loc})}] in [%e e]] in
+          (* (a, ..., z) *)
+          (* let pattern = { *)
+          (*   ppat_desc = Ppat_tuple (List.map (fun x -> { *)
+          (*         ppat_desc = Ppat_var (fst x); *)
+          (*         ppat_loc = loc; *)
+          (*         ppat_loc_stack = exp.pexp_loc_stack; *)
+          (*         ppat_attributes = exp.pexp_attributes; *)
+          (*       }) *)
+          (*       val_fields); *)
+          (*   ppat_loc = loc; *)
+          (*   ppat_loc_stack = exp.pexp_loc_stack; *)
+          (*   ppat_attributes = exp.pexp_attributes; *)
+          (* } in *)
+
+
+          Option.some @@
+          Pcf_method(label, flag,
+                     Cfk_concrete(override,
+                                  wrap_expression @@
+                                  List.fold_left add_val_binding exp val_fields
+                                 ))
+      end
+    | f -> Option.some f
+  end
+  in Option.map (fun d -> { field with pcf_desc = d }) new_desc
+
+let add_DLS_to_val_fields ~loc val_fields =
+  let wrap_one_val field =
+    {
+      pcf_desc =
+        Pcf_val (make_str (Printf.sprintf "$actor_%s" (fst field).txt), Immutable,
+                 Cfk_concrete(
+                   Fresh, [%expr
+                     Domain.DLS.new_key (
+                       fun _ -> [%e snd field])
+                   ]));
+      pcf_loc = loc;
+      pcf_attributes = []
+    } in List.map wrap_one_val val_fields
+
 let transform =
   object (_self)
     inherit Ast_traverse.map as super
@@ -52,12 +128,7 @@ let transform =
         (* move self to function self -> obj *)
         | [%expr [%actor [%e? {pexp_desc = Pexp_object class_struct; _} as e]]] ->
           (* get all `val` fields (will be usefull for DLS) *)
-          let get_val x =
-            match x.pcf_desc with
-            | Pcf_val (name, _, Cfk_concrete(_, e)) -> Some (name, e)
-            | _ -> None
-          in
-          let val_fields = cat_maybes @@ List.map get_val @@ class_struct.pcstr_fields in
+          let val_fields = get_val_fields class_struct.pcstr_fields in
           (* If self is defined or not *)
           begin
             match class_struct.pcstr_self.ppat_desc with
@@ -65,61 +136,11 @@ let transform =
             | Ppat_any -> () (* object ... end *)
             | _ -> ();
           end;
-          let add_DLS val_fields field =
-            let new_desc = begin
-              match field.pcf_desc with
-              | Pcf_val _ -> None
-              | Pcf_method(label, flag, Cfk_concrete(override, exp)) -> begin
-                  (* call values '$actor_mem' *)
-                  let f, exp =
-                    match exp.pexp_desc with
-                    | Pexp_poly(e, ty) ->
-                      let f e = {exp with pexp_desc = Pexp_poly(e, ty)} in (f, e)
-                    | _ -> (Fun.id, e)
-                  in
-                  let loc = exp.pexp_loc in
-                  (* (a, ..., z) *)
-                  let pattern = {
-                    ppat_desc = Ppat_tuple (List.map (fun x -> {
-                          ppat_desc = Ppat_var (fst x);
-                          ppat_loc = loc;
-                          ppat_loc_stack = e.pexp_loc_stack;
-                          ppat_attributes = e.pexp_attributes;
-                        })
-                        val_fields);
-                    ppat_loc = loc;
-                    ppat_loc_stack = e.pexp_loc_stack;
-                    ppat_attributes = e.pexp_attributes;
-                  } in
-                  Option.some @@
-                  Pcf_method(label, flag,
-                             Cfk_concrete(override,
-                                          f [%expr
-                                            let [%p pattern] = Domain.DLS.get _mem in
-                                            [%e exp]
-                                          ]))
-                end
-              | f -> Option.some f
-            end in Option.map (fun d -> { field with pcf_desc = d }) new_desc
-          in
 
           let loc = e.pexp_loc in
-          let new_fields = {
-            pcf_desc =
-              Pcf_val (make_str "_mem", Immutable,
-                       Cfk_concrete(
-                         Fresh, [%expr
-                           Domain.DLS.new_key (
-                             fun _ -> [%e
-                                (* (e_a, ..., e_z) *)
-                               { pexp_desc = Pexp_tuple(List.map snd val_fields);
-                                 pexp_loc = loc; pexp_loc_stack = e.pexp_loc_stack;
-                                 pexp_attributes = e.pexp_attributes;
-                               }
-                             ])
-                         ]))
-          ; pcf_loc = loc; pcf_attributes = e.pexp_attributes
-          } :: (cat_maybes @@ List.map (add_DLS val_fields) class_struct.pcstr_fields) in
+          let new_fields =
+            add_DLS_to_val_fields ~loc:loc val_fields @
+            (map_maybes (add_DLS val_fields) class_struct.pcstr_fields) in
           [%expr
             Oactor.create [%e {
               e with pexp_desc = Pexp_object {

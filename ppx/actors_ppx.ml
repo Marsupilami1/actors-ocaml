@@ -118,7 +118,7 @@ let add_val_binding (val_fields : val_desc list) exp =
       ppat_attributes = exp.pexp_attributes;
     } in
     let loc = exp.pexp_loc in
-    [%expr let [%p pattern] = Domain.DLS.get
+    [%expr let [@warning "-26"] [%p pattern] = Domain.DLS.get
                [%e {exp with
                     pexp_desc = Pexp_ident ({
                         txt = Lident field.name.txt;
@@ -140,7 +140,6 @@ let rec add_args_var ?(i = 0) args_list exp =
     let loc = exp.pexp_loc in
     let arg = {loc = loc; txt = Printf.sprintf "var_%d" i} in
     [%expr fun [%p Pat.var arg] -> [%e add_args_var ~i:(i+1) ps exp]]
-
 
 let rec apply_args ?(i = 0) args_list exp =
   match args_list with
@@ -252,43 +251,15 @@ let transform =
               Pexp_send([%expr Option.get ([%e obj].Actorsocaml.Oactor.methods)],
                         make_str @@ exp_to_string meth)
           } in
-          [%expr
-            [%e application]
-            (* let p, fill = Promise.create () in *)
-            (* Roundrobin.push_process [%e obj].Oactor.scheduler *)
-            (*   (fun _ -> fill [%e application]); *)
-            (* p *)
-          ]
-
-        (* object#!method args *)
-        | { pexp_desc =
-              Pexp_apply (
-                ([%expr [%e? obj] #! [%e? meth]] as prop),
-                args
-              )
-          ; _
-          } as r ->
-          let meth_name = exp_to_string meth in
-          let loc = prop.pexp_loc in
-          let application = {
-            r with
-            pexp_desc =
-              Pexp_apply ({ prop with
-                            pexp_desc = Pexp_send (
-                                [%expr Option.get ([%e obj].Actorsocaml.Oactor.methods)],
-                                make_str ~loc:meth.pexp_loc meth_name
-                              )
-                          }, args)
-          } in
-          (* let loc = prop.pexp_loc in *)
-          [%expr
-            [%e application]
-          ]
+          [%expr [%e application]]
         | _ -> super#expression expr
       in
       default_loc := prev_default_loc;
       new_expr
   end
+
+
+let [@warning "-27"] f x = 0
 
 let () =
   Driver.register_transformation

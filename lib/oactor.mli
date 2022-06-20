@@ -1,9 +1,9 @@
 (** The type of the actor. *)
 type 'a t = {
   scheduler : Roundrobin.t;
-  methods : 'a;
+  mutable methods : 'a Option.t;
   mutable domain : unit Domain.t Option.t
 }
 
 (** [create methods] returns an actor with methods [methods]. *)
-val create : 'a -> 'a t
+val create : ('a t -> 'a) -> 'a t

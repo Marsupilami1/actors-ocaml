@@ -73,27 +73,13 @@ let add_DLS val_fields field =
                              pexp_desc = Pexp_ident ({
                                  txt = Lident (Printf.sprintf "$actor_%s" (fst field).txt);
                                  loc})}] in [%e e]] in
-          (* (a, ..., z) *)
-          (* let pattern = { *)
-          (*   ppat_desc = Ppat_tuple (List.map (fun x -> { *)
-          (*         ppat_desc = Ppat_var (fst x); *)
-          (*         ppat_loc = loc; *)
-          (*         ppat_loc_stack = exp.pexp_loc_stack; *)
-          (*         ppat_attributes = exp.pexp_attributes; *)
-          (*       }) *)
-          (*       val_fields); *)
-          (*   ppat_loc = loc; *)
-          (*   ppat_loc_stack = exp.pexp_loc_stack; *)
-          (*   ppat_attributes = exp.pexp_attributes; *)
-          (* } in *)
 
-
-          Option.some @@
-          Pcf_method(label, flag,
-                     Cfk_concrete(override,
-                                  wrap_expression @@
-                                  List.fold_left add_val_binding exp val_fields
-                                 ))
+        Option.some @@
+        Pcf_method(label, flag,
+                   Cfk_concrete(override,
+                                wrap_expression @@
+                                List.fold_left add_val_binding exp val_fields
+                               ))
       end
     | f -> Option.some f
   end
@@ -114,7 +100,7 @@ let add_DLS_to_val_fields ~loc val_fields =
     } in List.map wrap_one_val val_fields
 
 let transform =
-  object (_self)
+  object (self)
     inherit Ast_traverse.map as super
 
     method! expression expr =
@@ -129,23 +115,31 @@ let transform =
         | [%expr [%actor [%e? {pexp_desc = Pexp_object class_struct; _} as e]]] ->
           (* get all `val` fields (will be usefull for DLS) *)
           let val_fields = get_val_fields class_struct.pcstr_fields in
-          (* If self is defined or not *)
-          begin
+
+          let self_name = begin
             match class_struct.pcstr_self.ppat_desc with
-            | Ppat_var _ -> () (* object (self) ... end *)
-            | Ppat_any -> () (* object ... end *)
-            | _ -> ();
-          end;
+            | Ppat_var name -> name.txt (* object (self) ... end *)
+            | _ -> "_self" (* object ... end *)
+          end in
 
           let loc = e.pexp_loc in
           let new_fields =
             add_DLS_to_val_fields ~loc:loc val_fields @
             (map_maybes (add_DLS val_fields) class_struct.pcstr_fields) in
           [%expr
-            Oactor.create [%e {
-              e with pexp_desc = Pexp_object {
-                class_struct with pcstr_fields = new_fields
-              }}]
+            Oactor.create (fun [%p {
+                ppat_desc = Ppat_var (make_str self_name);
+                ppat_loc = loc;
+                ppat_attributes = [];
+                ppat_loc_stack = [];
+              }] -> [%e self#expression {
+                e with pexp_desc = Pexp_object {
+                pcstr_fields = new_fields;
+                pcstr_self = {
+                  class_struct.pcstr_self with
+                  ppat_desc = Ppat_any
+                }
+              }}])
           ]
 
         (* object#!method *)
@@ -153,7 +147,7 @@ let transform =
           let loc = expr.pexp_loc in
           let application = {
             expr with
-            pexp_desc = Pexp_send([%expr [%e obj].Oactor.methods], make_str @@ exp_to_string meth)
+            pexp_desc = Pexp_send([%expr Option.get ([%e obj].Oactor.methods)], make_str @@ exp_to_string meth)
           } in
           [%expr
             let p, fill = Promise.create () in
@@ -179,7 +173,7 @@ let transform =
                 { prop with
                   pexp_desc =
                     Pexp_send (
-                      [%expr [%e obj].methods],
+                      [%expr Option.get ([%e obj].methods)],
                       make_str ~loc:meth.pexp_loc meth_name
                     )
                 }, args

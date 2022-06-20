@@ -1,7 +1,7 @@
 (* Module Oactor *)
 type 'a t = {
   scheduler : Roundrobin.t;
-  methods : 'a;
+  mutable methods : 'a Option.t;
   mutable domain : unit Domain.t Option.t
 }
 
@@ -15,10 +15,11 @@ let stop self =
     | Roundrobin.Stop -> ()
 
 let create methods =
-  let a = {
+  let self = {
     scheduler = Roundrobin.create ();
-    methods = methods;
+    methods = None;
     domain = None
   } in
-  Gc.finalise stop a;
-  a
+  self.methods <- Some (methods self);
+  Gc.finalise stop self;
+  self

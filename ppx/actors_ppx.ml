@@ -1,8 +1,7 @@
 (* This code is heavily inspired by:
    https://github.com/ocsigen/js_of_ocaml/blob/master/ppx/ppx_js/lib_internal/ppx_js_internal.ml *)
 open Ppxlib
-open Ast_helper
-open Asttypes
+open Ast_helper open Asttypes
 open Parsetree
 
 exception Syntax_error of Location.Error.t
@@ -40,64 +39,163 @@ let rec cat_maybes l =
 let map_maybes f l =
   cat_maybes (List.map f l)
 
-let get_val_fields fields =
-  let get_val x =
+type val_desc = { name : string loc; expr : expression }
+type meth_desc = {
+  name : string loc;
+  expr : expression;
+  args : pattern list;
+  flag : private_flag;
+}
+
+let rec destruct f =
+  match f.pexp_desc with
+  | Pexp_fun(_, _, pattern, body) ->
+    let (args, e) = destruct body in
+    (pattern :: args, e)
+  | _ -> ([], f)
+
+let split_fields fields =
+  let worker x (vals, meths) =
     match x.pcf_desc with
-    | Pcf_val (name, _, Cfk_concrete(_, e)) -> Some (name, e)
-    | _ -> None
+    | Pcf_val (name, _, Cfk_concrete(_, e))  ->
+      ({name = name; expr = e} :: vals, meths)
+    | Pcf_method(name, flag, Cfk_concrete(Fresh, {pexp_desc = Pexp_poly(f, _); _})) ->
+      let args, e = destruct f in
+      (vals, {name; flag; args; expr = e} :: meths)
+    | _ -> (vals, meths)
   in
-  map_maybes get_val fields
+  List.fold_right worker fields ([], [])
 
-let add_DLS val_fields field =
-  let new_desc = begin
-    match field.pcf_desc with
-    | Pcf_val _ -> None
-    | Pcf_method(label, flag, Cfk_concrete(override, exp)) -> begin
-        let wrap_expression, exp =
-          match exp.pexp_desc with
-          | Pexp_poly(e, ty) ->
-            let f e = {exp with pexp_desc = Pexp_poly(e, ty)} in (f, e)
-          | _ -> (Fun.id, exp)
-        in
-        let loc = exp.pexp_loc in
+let field_of_desc ~loc meth_field =
+  {pcf_desc = Pcf_method(meth_field.name,
+                         meth_field.flag,
+                         Cfk_concrete(Fresh, meth_field.expr));
+   pcf_loc = loc;
+   pcf_attributes = [];
+  }
 
-        let add_val_binding e field =
-          let pattern = {
-            ppat_desc = Ppat_var (fst field);
-            ppat_loc = loc;
-            ppat_loc_stack = exp.pexp_loc_stack;
-            ppat_attributes = exp.pexp_attributes;
-          }
-          in [%expr let [%p pattern] = Domain.DLS.get
-                        [%e {e with
-                             pexp_desc = Pexp_ident ({
-                                 txt = Lident (Printf.sprintf "$actor_%s" (fst field).txt);
-                                 loc})}] in [%e e]] in
-
-        Option.some @@
-        Pcf_method(label, flag,
-                   Cfk_concrete(override,
-                                wrap_expression @@
-                                List.fold_left add_val_binding exp val_fields
-                               ))
-      end
-    | f -> Option.some f
-  end
-  in Option.map (fun d -> { field with pcf_desc = d }) new_desc
-
-let add_DLS_to_val_fields ~loc val_fields =
-  let wrap_one_val field =
+let add_DLS_to_val_fields ~loc (val_fields : val_desc list) =
+  let wrap_one_val (field : val_desc) =
     {
       pcf_desc =
-        Pcf_val (make_str (Printf.sprintf "$actor_%s" (fst field).txt), Immutable,
+        Pcf_val (field.name , Immutable,
                  Cfk_concrete(
                    Fresh, [%expr
                      Domain.DLS.new_key (
-                       fun _ -> [%e snd field])
+                       fun _ -> [%e field.expr])
                    ]));
       pcf_loc = loc;
       pcf_attributes = []
-    } in List.map wrap_one_val val_fields
+    }
+  in List.map wrap_one_val val_fields
+
+let private_name meth_field_name =
+  {meth_field_name with
+   txt = Printf.sprintf "$actor_meth_%s" meth_field_name.txt
+  }
+
+let add_val_definition (val_fields : val_desc list) exp =
+  let add_one_definition exp (field : val_desc) =
+    let pattern = {
+      ppat_desc = Ppat_var field.name;
+      ppat_loc = exp.pexp_loc;
+      ppat_loc_stack = exp.pexp_loc_stack;
+      ppat_attributes = exp.pexp_attributes;
+    } in
+    let loc = exp.pexp_loc in
+    [%expr
+      let [%p pattern] = Domain.DLS.new_key (fun _ -> [%e field.expr]) in
+      [%e exp]
+    ]
+  in List.fold_left add_one_definition exp val_fields
+
+let add_val_binding (val_fields : val_desc list) exp =
+  let add_one_binding exp (field : val_desc) =
+    let pattern = {
+      ppat_desc = Ppat_var field.name;
+      ppat_loc = exp.pexp_loc;
+      ppat_loc_stack = exp.pexp_loc_stack;
+      ppat_attributes = exp.pexp_attributes;
+    } in
+    let loc = exp.pexp_loc in
+    [%expr let [%p pattern] = Domain.DLS.get
+               [%e {exp with
+                    pexp_desc = Pexp_ident ({
+                        txt = Lident field.name.txt;
+                        loc})}] in [%e exp]]
+  in List.fold_left add_one_binding exp val_fields
+
+(* could be written using fold *)
+let rec add_args args_list exp =
+  match args_list with
+  | [] -> exp
+  | p::ps ->
+    let loc = exp.pexp_loc in
+    [%expr fun [%p p] -> [%e add_args ps exp]]
+
+let rec add_args_var ?(i = 0) args_list exp =
+  match args_list with
+  | [] -> exp
+  | _::ps ->
+    let loc = exp.pexp_loc in
+    let arg = {loc = loc; txt = Printf.sprintf "var_%d" i} in
+    [%expr fun [%p Pat.var arg] -> [%e add_args_var ~i:(i+1) ps exp]]
+
+
+let rec apply_args ?(i = 0) args_list exp =
+  match args_list with
+  | [] -> exp
+  | _::ps ->
+    let loc = exp.pexp_loc in
+    let arg = {loc = loc; txt = Lident(Printf.sprintf "var_%d" i)} in
+    apply_args ~i:(i+1) ps [%expr [%e exp] [%e Exp.ident arg]]
+
+let add_meth_definition
+    (val_fields : val_desc list)
+    (meth_fields : meth_desc list)
+    exp =
+  let add_one_definition exp (field : meth_desc) =
+    let pattern = {
+      ppat_desc = Ppat_var(private_name field.name);
+      ppat_loc = exp.pexp_loc;
+      ppat_loc_stack = exp.pexp_loc_stack;
+      ppat_attributes = exp.pexp_attributes;
+    } in
+    let loc = exp.pexp_loc in
+    [%expr
+      let [%p pattern] =
+        [%e add_val_binding val_fields (add_args field.args field.expr)]
+      in [%e exp]
+    ]
+  in List.fold_left add_one_definition exp meth_fields
+
+let ident_of_name ~loc name = {
+  pexp_desc = Pexp_ident({txt = Lident name; loc = loc});
+  pexp_loc = loc;
+  pexp_attributes = [];
+  pexp_loc_stack = [];
+}
+
+let make_async_call self_name meth_field =
+  let loc = meth_field.name.loc in
+  let self = ident_of_name ~loc:loc self_name in
+
+  { meth_field with
+    expr = add_args_var meth_field.args [%expr
+        let p, fill = Actorsocaml.Promise.create () in
+        Actorsocaml.Roundrobin.push_process
+          [%e self].Actorsocaml.Oactor.scheduler
+          (fun _ -> fill
+              [%e apply_args meth_field.args
+                  (ident_of_name ~loc @@ (private_name meth_field.name).txt)]);
+        p]
+  }
+
+let lambda_lift self_name (_val_fields : val_desc list) (meth_fields : meth_desc list) =
+  List.map
+    (fun field ->
+       make_async_call self_name field)
+    meth_fields
 
 let transform =
   object (self)
@@ -113,8 +211,8 @@ let transform =
         (* object%actor ... end *)
         (* move self to function self -> obj *)
         | [%expr [%actor [%e? {pexp_desc = Pexp_object class_struct; _} as e]]] ->
-          (* get all `val` fields (will be usefull for DLS) *)
-          let val_fields = get_val_fields class_struct.pcstr_fields in
+          (* get all `val` and `method` fields *)
+          let val_fields, meth_fields = split_fields class_struct.pcstr_fields in
 
           let self_name = begin
             match class_struct.pcstr_self.ppat_desc with
@@ -124,22 +222,25 @@ let transform =
 
           let loc = e.pexp_loc in
           let new_fields =
-            add_DLS_to_val_fields ~loc:loc val_fields @
-            (map_maybes (add_DLS val_fields) class_struct.pcstr_fields) in
+            (List.map (field_of_desc ~loc:loc) @@ lambda_lift self_name val_fields meth_fields)
+          in
           [%expr
             Oactor.create (fun [%p {
                 ppat_desc = Ppat_var (make_str self_name);
                 ppat_loc = loc;
                 ppat_attributes = [];
                 ppat_loc_stack = [];
-              }] -> [%e self#expression {
-                e with pexp_desc = Pexp_object {
-                pcstr_fields = new_fields;
-                pcstr_self = {
-                  class_struct.pcstr_self with
-                  ppat_desc = Ppat_any
-                }
-              }}])
+              }] -> [%e
+                self#expression @@
+                add_val_definition val_fields @@
+                add_meth_definition val_fields meth_fields @@ {
+                  e with pexp_desc = Pexp_object {
+                    pcstr_fields = new_fields;
+                    pcstr_self = {
+                      class_struct.pcstr_self with
+                      ppat_desc = Ppat_any
+                    }
+                  }}])
           ]
 
         (* object#!method *)
@@ -147,13 +248,16 @@ let transform =
           let loc = expr.pexp_loc in
           let application = {
             expr with
-            pexp_desc = Pexp_send([%expr Option.get ([%e obj].Oactor.methods)], make_str @@ exp_to_string meth)
+            pexp_desc =
+              Pexp_send([%expr Option.get ([%e obj].Actorsocaml.Oactor.methods)],
+                        make_str @@ exp_to_string meth)
           } in
           [%expr
-            let p, fill = Promise.create () in
-            Roundrobin.push_process [%e obj].Oactor.scheduler
-              (fun _ -> fill [%e application]);
-            p
+            [%e application]
+            (* let p, fill = Promise.create () in *)
+            (* Roundrobin.push_process [%e obj].Oactor.scheduler *)
+            (*   (fun _ -> fill [%e application]); *)
+            (* p *)
           ]
 
         (* object#!method args *)
@@ -169,22 +273,16 @@ let transform =
           let application = {
             r with
             pexp_desc =
-              Pexp_apply (
-                { prop with
-                  pexp_desc =
-                    Pexp_send (
-                      [%expr Option.get ([%e obj].methods)],
-                      make_str ~loc:meth.pexp_loc meth_name
-                    )
-                }, args
-              )
+              Pexp_apply ({ prop with
+                            pexp_desc = Pexp_send (
+                                [%expr Option.get ([%e obj].Actorsocaml.Oactor.methods)],
+                                make_str ~loc:meth.pexp_loc meth_name
+                              )
+                          }, args)
           } in
-          let loc = prop.pexp_loc in
+          (* let loc = prop.pexp_loc in *)
           [%expr
-            let (p, fill) = Promise.create () in
-            Roundrobin.push_process [%e obj].Oactor.scheduler
-              (fun _ -> fill [%e application]);
-            p
+            [%e application]
           ]
         | _ -> super#expression expr
       in

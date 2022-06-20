@@ -9,7 +9,7 @@ open Actorsocaml
 
 (* same problem for `self` *)
 
-let x =
+let x : <get : int Promise.t > Oactor.t =
   object%actor
     val y = 42
     method get = y
@@ -32,7 +32,7 @@ let pong =
 
 let main _ =
   Printf.printf "%d\n" @@ Promise.await x#!get;
-    Promise.await @@ ping#!ping pong 10
+  Promise.await @@ ping#!ping pong 10
 
 
 let _ = Actor.Main.run main

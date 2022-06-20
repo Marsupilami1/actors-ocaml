@@ -21,7 +21,7 @@ and RingMember : sig
   type t
   val create : (t -> MessageRing.method_type) -> t
   val send : t -> 'a MessageRing.t -> 'a Promise.t
-end = Actor.Make(Multiroundrobin)(MessageRing)
+end = Actor.DefaultActor(MessageRing)
 
 type memory = {next : RingMember.t Option.t}
 let rec actor_ring_methods =
@@ -71,7 +71,7 @@ let main _ =
     Promise.await p;
     print_endline "Creation: Done";
 
-    let p' = RingMember.send leader (Send(100)) in
+    let p' = RingMember.send leader (Send(10_000)) in
     Promise.await p';
     print_endline "Cycle: Done";
 

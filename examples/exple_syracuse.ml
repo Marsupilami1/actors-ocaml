@@ -6,7 +6,7 @@ module MyMessage = struct
   type method_type = { m : 'a . ('a Promise.t -> 'a) -> 'a t -> 'a }
 end
 
-module MyActor = Actor.Make(Roundrobin)(MyMessage)
+module MyActor = Actor.Make(Multiroundrobin)(MyMessage)
 
 let actor_methods =
   let methods
@@ -31,8 +31,10 @@ let actor_methods =
 let main _ =
   let actor = MyActor.create actor_methods in
 
-  let n = 989345275647 in
-  let p = Promise.join @@ MyActor.send actor (Syracuse n) in
-  assert (1 = Promise.await p)
+  (* let n = 989345275647 in *)
+  let n = 42 in
+  let _p = Promise.join @@ MyActor.send actor (Syracuse n) in
+  ()
+  (* assert (1 = Promise.await p) *)
 
 let _ = Actor.Main.run main

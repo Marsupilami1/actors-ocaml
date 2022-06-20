@@ -16,7 +16,7 @@ and Ping : sig
   type t
   val create : (t -> MessagePing.method_type) -> t
   val send : t -> 'a MessagePing.t -> 'a Promise.t
-end = Actor.Make(Roundrobin)(MessagePing)
+end = Actor.DefaultActor(MessagePing)
 
 and MessagePong : sig
   type 'a t = Pong : Ping.t * int -> unit t
@@ -29,7 +29,7 @@ and Pong : sig
   type t
   val create : (t -> MessagePong.method_type) -> t
   val send : t -> 'a MessagePong.t -> 'a Promise.t
-end = Actor.Make(Roundrobin)(MessagePong)
+end = Actor.DefaultActor(MessagePong)
 
 
 let actor_ping_methods =

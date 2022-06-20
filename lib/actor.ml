@@ -30,6 +30,8 @@ module Make(S : Scheduler.S)(M : Message.S) = struct
     S.yield ()
 end
 
+module DefaultActor = Make(Multiroundrobin)
+
 
 module Main = struct
   module MainMessage = struct

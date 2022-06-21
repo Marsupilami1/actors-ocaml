@@ -22,14 +22,14 @@ let ping =
     method ping pong n =
       Printf.printf "Ping: %d\n%!" n;
       if n <= 0 then ()
-      else Promise.await @@ pong#!pong self (n - 1)
+      else forward @@ pong#!pong self (n - 1)
   end
 let pong =
   object%actor (self)
     method pong ping n =
       Printf.printf "Pong: %d\n%!" n;
       if n <= 0 then ()
-      else Promise.await @@ ping#!ping self (n - 1)
+      else forward @@ ping#!ping self (n - 1)
   end
 
 let main _ =

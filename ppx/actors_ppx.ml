@@ -154,6 +154,12 @@ let rec apply_args ?(i = 0) args_list exp =
     let arg = {loc = loc; txt = Lident(Printf.sprintf "var_%d" i)} in
     apply_args ~i:(i+1) ps [%expr [%e exp] [%e Exp.ident arg]]
 
+let add_forward e =
+  let loc = e.pexp_loc in
+  [%expr fun [%p Pat.var (make_str "forward")] ->
+      [%e e]
+  ]
+
 let add_meth_definition
     (val_fields : val_desc list)
     (meth_fields : meth_desc list)
@@ -168,7 +174,7 @@ let add_meth_definition
     let loc = exp.pexp_loc in
     [%expr
       let [%p pattern] =
-        [%e add_args field.args (add_val_binding val_fields field.expr)]
+        [%e add_forward @@ add_args field.args (add_val_binding val_fields field.expr)]
       in [%e exp]
     ]
   in List.fold_left add_one_definition exp meth_fields
@@ -187,10 +193,11 @@ let make_async_call self_name meth_field =
   { meth_field with
     expr = add_args_var meth_field.args [%expr
         let p, fill = Actorsocaml.Promise.create () in
+        let forward p' = Promise.unify p p'; raise Actorsocaml.Roundrobin.Interrupt in
         Actorsocaml.Oactor.send [%e self]
           (fun _ -> fill
-              [%e apply_args meth_field.args
-                  (ident_of_name ~loc @@ (private_name meth_field.name).txt)]);
+              [%e apply_args meth_field.args @@
+                [%expr [%e ident_of_name ~loc @@ (private_name meth_field.name).txt] forward]]);
         p]
   }
 
@@ -278,7 +285,7 @@ let transform =
             pexp_desc = Pexp_ident {txt = Lident (dls_name lbl).txt; loc};
             pexp_loc = loc; pexp_attributes = []; pexp_loc_stack = [];
           } in
-          [%expr Domain.DLS.set [%e dls_ident] [%e value];]
+          [%expr Domain.DLS.set [%e dls_ident] [%e value]]
         | _ -> super#expression expr
       in
       default_loc := prev_default_loc;

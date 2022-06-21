@@ -255,14 +255,30 @@ let transform =
                         make_str @@ exp_to_string meth)
           } in
           [%expr [%e application]]
-        (* val_field <- v *)
-        | {pexp_desc = Pexp_setinstvar(lbl, value); _} as e ->
+        (* val_field <- v; ... *)
+        | [%expr [%e? {pexp_desc = Pexp_setinstvar(lbl, value); _} as e]; [%e? next]] ->
           let loc = e.pexp_loc in
-          let ident = {
+          let dls_ident = {
             pexp_desc = Pexp_ident {txt = Lident (dls_name lbl).txt; loc};
             pexp_loc = loc; pexp_attributes = []; pexp_loc_stack = [];
           } in
-          [%expr Domain.DLS.set [%e ident] [%e value]]
+          let ident = {
+            ppat_desc = Ppat_var lbl;
+            ppat_loc = loc; ppat_attributes = []; ppat_loc_stack = [];
+          } in
+          [%expr
+            Domain.DLS.set [%e dls_ident] [%e value];
+            let [@warning "-26"] [%p ident] = Domain.DLS.get [%e dls_ident] in
+            [%e next]
+          ]
+        (* val_field <- v *)
+        | {pexp_desc = Pexp_setinstvar(lbl, value); _} as e ->
+          let loc = e.pexp_loc in
+          let dls_ident = {
+            pexp_desc = Pexp_ident {txt = Lident (dls_name lbl).txt; loc};
+            pexp_loc = loc; pexp_attributes = []; pexp_loc_stack = [];
+          } in
+          [%expr Domain.DLS.set [%e dls_ident] [%e value];]
         | _ -> super#expression expr
       in
       default_loc := prev_default_loc;

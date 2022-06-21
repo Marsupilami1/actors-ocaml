@@ -76,10 +76,8 @@ module Main = struct
                 loop fifo;
             )
           | Promise.Get p -> Some (
-              print_endline "here";
               fun (k : (a, _) continuation) ->
                 while not (Promise.is_ready p) do
-                  print_endline "loop";
                   Domain.cpu_relax ()
                 done;
                 continue k (Promise.get p);

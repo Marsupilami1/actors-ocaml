@@ -74,11 +74,16 @@ let field_of_desc ~loc meth_field =
    pcf_attributes = [];
   }
 
+let dls_name val_field_name =
+  { val_field_name with
+    txt = Printf.sprintf "$actor_val_%s" val_field_name.txt
+  }
+
 let add_DLS_to_val_fields ~loc (val_fields : val_desc list) =
   let wrap_one_val (field : val_desc) =
     {
       pcf_desc =
-        Pcf_val (field.name , Immutable,
+        Pcf_val (dls_name field.name , Immutable,
                  Cfk_concrete(
                    Fresh, [%expr
                      Domain.DLS.new_key (
@@ -97,7 +102,7 @@ let private_name meth_field_name =
 let add_val_definition (val_fields : val_desc list) exp =
   let add_one_definition exp (field : val_desc) =
     let pattern = {
-      ppat_desc = Ppat_var field.name;
+      ppat_desc = Ppat_var (dls_name field.name);
       ppat_loc = exp.pexp_loc;
       ppat_loc_stack = exp.pexp_loc_stack;
       ppat_attributes = exp.pexp_attributes;
@@ -121,7 +126,7 @@ let add_val_binding (val_fields : val_desc list) exp =
     [%expr let [@warning "-26"] [%p pattern] = Domain.DLS.get
                [%e {exp with
                     pexp_desc = Pexp_ident ({
-                        txt = Lident field.name.txt;
+                        txt = Lident (dls_name field.name).txt;
                         loc})}] in [%e exp]]
   in List.fold_left add_one_binding exp val_fields
 
@@ -163,7 +168,7 @@ let add_meth_definition
     let loc = exp.pexp_loc in
     [%expr
       let [%p pattern] =
-        [%e add_val_binding val_fields (add_args field.args field.expr)]
+        [%e add_args field.args (add_val_binding val_fields field.expr)]
       in [%e exp]
     ]
   in List.fold_left add_one_definition exp meth_fields
@@ -250,14 +255,19 @@ let transform =
                         make_str @@ exp_to_string meth)
           } in
           [%expr [%e application]]
+        (* val_field <- v *)
+        | {pexp_desc = Pexp_setinstvar(lbl, value); _} as e ->
+          let loc = e.pexp_loc in
+          let ident = {
+            pexp_desc = Pexp_ident {txt = Lident (dls_name lbl).txt; loc};
+            pexp_loc = loc; pexp_attributes = []; pexp_loc_stack = [];
+          } in
+          [%expr Domain.DLS.set [%e ident] [%e value]]
         | _ -> super#expression expr
       in
       default_loc := prev_default_loc;
       new_expr
   end
-
-
-let [@warning "-27"] f x = 0
 
 let () =
   Driver.register_transformation

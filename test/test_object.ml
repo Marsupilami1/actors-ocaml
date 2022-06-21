@@ -11,8 +11,10 @@ open Actorsocaml
 
 let x =
   object%actor
-    val y = 42
-    method get = y
+    val mutable y = 0
+    method set n = y <- n
+    (* () are mandatory (otherwise we get the same value again and again) *)
+    method get () = y
   end
 
 let ping =
@@ -31,7 +33,8 @@ let pong =
   end
 
 let main _ =
-  Printf.printf "%d\n" @@ Promise.await x#!get;
+  Promise.get @@ x#!set 42;
+  Printf.printf "%d\n" @@ Promise.await @@ x#!get ();
   Promise.await @@ ping#!ping pong 10
 
 

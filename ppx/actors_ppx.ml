@@ -215,11 +215,9 @@ let transform =
       let prev_default_loc = !default_loc in
       default_loc := expr.pexp_loc;
       (* let { pexp_attributes; _ } = expr in *)
-      (* variant polymorphe pour les appels de méthodes *)
       let new_expr =
         match expr with
         (* object%actor ... end *)
-        (* move self to function self -> obj *)
         | [%expr [%actor [%e? {pexp_desc = Pexp_object class_struct; _} as e]]] ->
           (* get all `val` and `method` fields *)
           let val_fields, meth_fields = split_fields class_struct.pcstr_fields in

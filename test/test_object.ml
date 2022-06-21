@@ -1,14 +1,5 @@
 open Actorsocaml
 
-(* problem with `val`: *)
-(* they are refered as `value` in the code, so it's difficult *)
-(* to convert at ppx time (I think). *)
-(* We need to wrap them into DLS: *)
-(* - 1 per variable seems overkill; actually no *)
-(* - 1 for all is fine, but implies to construct a record at compile time *)
-
-(* same problem for `self` *)
-
 let x =
   object%actor
     val mutable y = 0

@@ -7,7 +7,7 @@ exception Stop
 exception Interrupt
 
 let spawned_actors = ref 0
-let max_domains = 1 (* for 8 cores hardware *)
+let max_domains = 7 (* for 8 cores hardware *)
 
 type process = unit -> unit
 type process_queue = process Chan.t
@@ -23,9 +23,11 @@ module Queue = struct
     v
 end
 
+type actor_info = {fifo : process_queue; mutable current : process Option.t}
+
 type domain_info = {
   (* data structure for accessing messages *)
-  fifos : process_queue Queue.t;
+  fifos : actor_info Queue.t;
   (* trigger to avoid spamming in get_process *)
   trigger : trigger;
   (* process count *)
@@ -65,13 +67,17 @@ let domains : domain_info Array.t =
         Atomic.decr info.p_count;
         (* find the next process to execute *)
         let res = ref None in
-        let current_actor_queue = ref @@ Queue.peek info.fifos in
+        let current_actor_info = ref @@ Queue.peek info.fifos in
         while !res = None do
-          current_actor_queue := Queue.peek info.fifos;
-          res := Chan.recv_poll @@ Queue.rotate info.fifos;
+          current_actor_info := Queue.peek info.fifos;
+          if !current_actor_info.current <> None then begin
+            res := !current_actor_info.current;
+            !current_actor_info.current <- None
+          end else
+            res := Chan.recv_poll @@ (Queue.rotate info.fifos).fifo;
         done;
         Mutex.unlock mutex;
-        Option.get !res, !current_actor_queue
+        Option.get !res, !current_actor_info
       in
 
       let push_process queue process =
@@ -84,7 +90,7 @@ let domains : domain_info Array.t =
       in
 
       let rec loop () =
-        let process, current_actor_queue = get_next_process () in
+        let process, current_actor_info = get_next_process () in
         match_with process () {
           retc = (fun _ -> loop ());
           exnc = (fun e -> match e with
@@ -99,12 +105,19 @@ let domains : domain_info Array.t =
                   (* So we add a callback to this promise to push the process *)
                   (* back to the queue *)
                   Promise.add_callback p (fun v ->
-                      push_process current_actor_queue (fun _ -> continue k v));
+                      push_process current_actor_info.fifo (fun _ -> continue k v));
                   loop ();
+              )
+            | Promise.Get p -> Some (
+                fun (k : (a, _) continuation) ->
+                  current_actor_info.current <- Some (fun _ -> continue k (Promise.get p));
+                  Mutex.lock @@ fst info.trigger;
+                  Atomic.incr @@ info.p_count;
+                  Mutex.unlock @@ fst info.trigger
               )
             | Promise.Async f -> Some (
                 fun (k : (a, _) continuation) ->
-                  push_process current_actor_queue f;
+                  push_process current_actor_info.fifo f;
                   continue k ()
               )
             | WaitFor condition -> Some (
@@ -112,7 +125,7 @@ let domains : domain_info Array.t =
                   if condition () then
                     continue k ()
                   else (
-                    push_process current_actor_queue (fun _ ->
+                    push_process current_actor_info.fifo (fun _ ->
                         wait_for condition; continue k ());
                     loop ()
                   )
@@ -143,7 +156,7 @@ let create () =
   let domain_info = domains.(index) in
   let mutex = fst domain_info.trigger in
   Mutex.lock mutex;
-  Queue.push queue domain_info.fifos;
+  Queue.push {fifo = queue; current = None} domain_info.fifos;
   Mutex.unlock mutex;
   queue, domains.(index).trigger, domains.(index).p_count
 

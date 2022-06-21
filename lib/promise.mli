@@ -11,6 +11,9 @@ type 'a t
 (** Effect raised by the {!await} function. *)
 type _ Effect.t += NotReady : 'a t -> 'a Effect.t
 
+(** Effect raised by the {!get} function. *)
+type _ Effect.t += Get : 'a t -> 'a Effect.t
+
 (** Effect raised by the {!async} function. *)
 type _ Effect.t += Async : (unit -> unit) -> unit Effect.t
 

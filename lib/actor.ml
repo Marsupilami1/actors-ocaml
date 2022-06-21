@@ -75,6 +75,16 @@ module Main = struct
                     push_process fifo (fun _ -> continue k v));
                 loop fifo;
             )
+          | Promise.Get p -> Some (
+              print_endline "here";
+              fun (k : (a, _) continuation) ->
+                while not (Promise.is_ready p) do
+                  print_endline "loop";
+                  Domain.cpu_relax ()
+                done;
+                continue k (Promise.get p);
+                loop fifo;
+            )
           | Promise.Async f -> Some (
               fun (k : (a, _) continuation) ->
                 push_process fifo f;
@@ -93,8 +103,8 @@ module Main = struct
           | _ -> None
       }
     let create () ={
-        processes = Domainslib.Chan.make_unbounded ();
-      }
+      processes = Domainslib.Chan.make_unbounded ();
+    }
     let stop fifo =
       push_process fifo (fun _ -> Gc.full_major (); raise Stop);
   end

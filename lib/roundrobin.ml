@@ -49,6 +49,14 @@ let rec loop fifo =
                 push_process fifo (fun _ -> continue k v));
             loop fifo;
         )
+      | Promise.Get p -> Some (
+          fun (k : (a, _) continuation) ->
+            while Fun.negate Promise.is_ready p do
+              Domain.cpu_relax ()
+            done;
+            continue k (Promise.get p);
+            loop fifo;
+        )
       | Promise.Async f -> Some (
           fun (k : (a, _) continuation) ->
             push_process fifo f;
@@ -71,7 +79,7 @@ let stop fifo =
   push_process fifo (fun _ -> Gc.full_major (); raise Stop);
   try Domain.join (Option.get fifo.domain) with
   | Stop -> ();
-  fifo.domain <- None
+    fifo.domain <- None
 
 let create () =
   let a = {

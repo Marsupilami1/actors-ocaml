@@ -40,6 +40,7 @@ let create () =
   (p, fill p)
 
 type _ Effect.t += NotReady : 'a t -> 'a Effect.t
+type _ Effect.t += Get : 'a t -> 'a Effect.t
 
 
 let rec await p =
@@ -50,7 +51,7 @@ let rec await p =
 
 let rec get p =
   match Atomic.get p with
-  | Empty _ -> Domain.cpu_relax (); get p
+  | Empty _ -> perform @@ Get p
   | Filled v -> v
   | Forwarded p' -> get (find_leader p')
 

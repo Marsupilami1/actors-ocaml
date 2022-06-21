@@ -9,7 +9,7 @@ open Actorsocaml
 
 (* same problem for `self` *)
 
-let x : <get : int Promise.t > Oactor.t =
+let x =
   object%actor
     val y = 42
     method get = y

@@ -182,8 +182,7 @@ let make_async_call self_name meth_field =
   { meth_field with
     expr = add_args_var meth_field.args [%expr
         let p, fill = Actorsocaml.Promise.create () in
-        Actorsocaml.Roundrobin.push_process
-          [%e self].Actorsocaml.Oactor.scheduler
+        Actorsocaml.Oactor.send [%e self]
           (fun _ -> fill
               [%e apply_args meth_field.args
                   (ident_of_name ~loc @@ (private_name meth_field.name).txt)]);
@@ -241,14 +240,13 @@ let transform =
                     }
                   }}])
           ]
-
         (* object#!method *)
         | [%expr [%e? obj] #! [%e? meth]] as expr ->
           let loc = expr.pexp_loc in
           let application = {
             expr with
             pexp_desc =
-              Pexp_send([%expr Option.get ([%e obj].Actorsocaml.Oactor.methods)],
+              Pexp_send([%expr Actorsocaml.Oactor.methods [%e obj]],
                         make_str @@ exp_to_string meth)
           } in
           [%expr [%e application]]

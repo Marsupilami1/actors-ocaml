@@ -5,6 +5,11 @@ type 'a t = {
   mutable domain : unit Domain.t Option.t
 }
 
+let send actor process =
+  Roundrobin.push_process actor.scheduler process
+
+let methods actor = Option.get actor.methods
+
 let stop self =
   match self.domain with
   | None -> failwith "Cannot stop non-running actor";

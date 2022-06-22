@@ -14,7 +14,7 @@ module type S = sig
   type process = unit -> unit
 
   (** [create ()] makes a new scheduler. *)
-  val create : unit -> t
+  val create : unit -> t * Domain.id
 
   (** [push_process s p] adds the process [p] to the
       scheduler [s]. *)

@@ -39,7 +39,10 @@ let rec cat_maybes l =
 let map_maybes f l =
   cat_maybes (List.map f l)
 
-type val_desc = { name : string loc; expr : expression }
+type val_desc = {
+  name : string loc;
+  expr : expression
+}
 type meth_desc = {
   name : string loc;
   expr : expression;
@@ -64,34 +67,33 @@ let split_fields fields =
       (vals, {name; flag; args; expr = e} :: meths)
     | _ -> (vals, meths)
   in
-  List.fold_right worker fields ([], [])
+  List.fold_right worker fields ([] , [])
 
 let field_of_desc ~loc meth_field =
   {pcf_desc = Pcf_method(meth_field.name,
                          meth_field.flag,
-                         Cfk_concrete(Fresh, meth_field.expr));
+                         Cfk_concrete(Fresh, Exp.poly meth_field.expr None));
    pcf_loc = loc;
    pcf_attributes = [];
   }
 
-let dls_name val_field_name =
-  { val_field_name with
-    txt = Printf.sprintf "$actor_val_%s" val_field_name.txt
-  }
+let dls_name val_field_name = {
+  val_field_name with
+  txt = Printf.sprintf "$actor_val_%s" val_field_name.txt
+}
 
 let add_DLS_to_val_fields ~loc (val_fields : val_desc list) =
-  let wrap_one_val (field : val_desc) =
-    {
-      pcf_desc =
-        Pcf_val (dls_name field.name , Immutable,
-                 Cfk_concrete(
-                   Fresh, [%expr
-                     Domain.DLS.new_key (
-                       fun _ -> [%e field.expr])
-                   ]));
-      pcf_loc = loc;
-      pcf_attributes = []
-    }
+  let wrap_one_val (field : val_desc) = {
+    pcf_desc =
+      Pcf_val (dls_name field.name , Immutable,
+               Cfk_concrete(
+                 Fresh, [%expr
+                   Domain.DLS.new_key (
+                     fun _ -> [%e field.expr])
+                 ]));
+    pcf_loc = loc;
+    pcf_attributes = []
+  }
   in List.map wrap_one_val val_fields
 
 let private_name meth_field_name =
@@ -130,13 +132,11 @@ let add_val_binding (val_fields : val_desc list) exp =
                         loc})}] in [%e exp]]
   in List.fold_left add_one_binding exp val_fields
 
-(* could be written using fold *)
-let rec add_args args_list exp =
-  match args_list with
-  | [] -> exp
-  | p::ps ->
-    let loc = exp.pexp_loc in
-    [%expr fun [%p p] -> [%e add_args ps exp]]
+let add_args args_list exp =
+  let loc = exp.pexp_loc in
+  List.fold_right (fun p e ->
+      [%expr fun [%p p] -> [%e e]]
+    ) args_list exp
 
 let rec add_args_var ?(i = 0) args_list exp =
   match args_list with
@@ -157,7 +157,7 @@ let rec apply_args ?(i = 0) args_list exp =
 let add_forward e =
   let loc = e.pexp_loc in
   [%expr fun [%p Pat.var (make_str "forward")] ->
-      [%e e]
+    [%e e]
   ]
 
 let add_meth_definition
@@ -189,11 +189,10 @@ let ident_of_name ~loc name = {
 let make_async_call self_name meth_field =
   let loc = meth_field.name.loc in
   let self = ident_of_name ~loc:loc self_name in
-
   { meth_field with
     expr = add_args_var meth_field.args [%expr
         let p, fill = Actorsocaml.Promise.create () in
-        let forward p' = Promise.unify p p'; raise Actorsocaml.Roundrobin.Interrupt in
+        let forward p' = Promise.unify p p'; raise Actorsocaml.Multiroundrobin.Interrupt in
         Actorsocaml.Oactor.send [%e self]
           (fun _ -> fill
               [%e apply_args meth_field.args @@
@@ -201,10 +200,35 @@ let make_async_call self_name meth_field =
         p]
   }
 
+let meth_sync_name name =
+  Loc.map ~f:(fun s -> s ^ "_sync") name
+
+let make_sync_call self_name meth_field =
+  let loc = meth_field.name.loc in
+  let self = ident_of_name ~loc:loc self_name in
+  { meth_field with
+    name = meth_sync_name meth_field.name;
+    expr = add_args_var meth_field.args [%expr
+        if Actorsocaml.Oactor.in_same_domain [%e self] then
+          let forward p' = Promise.await p' in
+          [%e apply_args meth_field.args @@
+            [%expr [%e ident_of_name ~loc
+              @@ (private_name meth_field.name).txt] forward]];
+        else
+          Actorsocaml.Promise.await @@
+          [%e apply_args meth_field.args
+              [%expr [%e self] #!
+                  [%e ident_of_name
+                      ~loc:meth_field.name.loc meth_field.name.txt]]]
+      ]
+  }
+
 let lambda_lift self_name (_val_fields : val_desc list) (meth_fields : meth_desc list) =
-  List.map
-    (fun field ->
-       make_async_call self_name field)
+  List.concat_map
+    (fun field -> [
+         make_async_call self_name field;
+         make_sync_call  self_name field;
+       ])
     meth_fields
 
 let transform =
@@ -258,6 +282,16 @@ let transform =
             pexp_desc =
               Pexp_send([%expr Actorsocaml.Oactor.methods [%e obj]],
                         make_str @@ exp_to_string meth)
+          } in
+          [%expr [%e application]]
+        (* object#.method *)
+        | [%expr [%e? obj] #. [%e? meth]] as expr ->
+          let loc = expr.pexp_loc in
+          let application = {
+            expr with
+            pexp_desc =
+              Pexp_send([%expr Actorsocaml.Oactor.methods [%e obj]],
+                        meth_sync_name @@ make_str @@ exp_to_string meth)
           } in
           [%expr [%e application]]
         (* val_field <- v; ... *)

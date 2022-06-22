@@ -88,4 +88,4 @@ let create () =
   } in
   let d = Domain.spawn (fun _ -> loop a) in
   a.domain <- Some d;
-  a
+  a, Domain.get_id d

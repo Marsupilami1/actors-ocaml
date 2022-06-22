@@ -1,30 +1,24 @@
 (* Module Oactor *)
 type 'a t = {
-  scheduler : Roundrobin.t;
+  scheduler : Multiroundrobin.t;
   mutable methods : 'a Option.t;
-  mutable domain : unit Domain.t Option.t
+  mutable domain : Domain.id
 }
 
 let send actor process =
-  Roundrobin.push_process actor.scheduler process
+  Multiroundrobin.push_process actor.scheduler process
 
 let methods actor = Option.get actor.methods
 
-let stop self =
-  match self.domain with
-  | None -> failwith "Cannot stop non-running actor";
-  | Some d ->
-    Roundrobin.stop self.scheduler;
-    self.domain <- None;
-    try Domain.join d with
-    | Roundrobin.Stop -> ()
+let in_same_domain actor =
+  actor.domain = Domain.self ()
 
 let create methods =
+  let scheduler, domain = Multiroundrobin.create () in
   let self = {
-    scheduler = Roundrobin.create ();
+    scheduler;
     methods = None;
-    domain = None
+    domain;
   } in
   self.methods <- Some (methods self);
-  Gc.finalise stop self;
   self

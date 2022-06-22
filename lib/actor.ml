@@ -10,7 +10,7 @@ module Make(S : Scheduler.S)(M : Message.S) = struct
 
   let create methods =
     let a = {
-      scheduler = S.create ();
+      scheduler = fst @@ S.create ();
       methods = methods;
     } in
     Gc.finalise stop a;
@@ -100,9 +100,9 @@ module Main = struct
             )
           | _ -> None
       }
-    let create () ={
+    let create () = {
       processes = Domainslib.Chan.make_unbounded ();
-    }
+    }, Domain.self ()
     let stop fifo =
       push_process fifo (fun _ -> Gc.full_major (); raise Stop);
   end
@@ -110,7 +110,7 @@ module Main = struct
   include Make(MainScheduler)(MainMessage)
 
   let run main =
-    let fifo = MainScheduler.create () in
+    let fifo = fst @@ MainScheduler.create () in
     MainScheduler.push_process fifo (fun _ ->
         main (); MainScheduler.stop fifo);
     (try MainScheduler.loop fifo with

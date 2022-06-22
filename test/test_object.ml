@@ -4,7 +4,6 @@ let x =
   object%actor
     val mutable y = 0
     method set n = y <- n
-    (* () are mandatory (otherwise we get the same value again and again) *)
     method get () = y
   end
 
@@ -13,7 +12,7 @@ let ping =
     method ping pong n =
       Printf.printf "Ping: %d\n%!" n;
       if n <= 0 then ()
-      else forward @@ pong#!pong self (n - 1)
+      else pong#.pong self (n - 1)
   end
 let pong =
   object%actor (self)
@@ -24,7 +23,7 @@ let pong =
   end
 
 let main _ =
-  Promise.get @@ x#!set 42;
+  x#.set 42;
   Printf.printf "%d\n" @@ Promise.await @@ x#!get ();
   Promise.await @@ ping#!ping pong 10
 

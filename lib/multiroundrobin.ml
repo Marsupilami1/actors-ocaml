@@ -158,7 +158,8 @@ let create () =
   Mutex.lock mutex;
   Queue.push {fifo = queue; current = None} domain_info.fifos;
   Mutex.unlock mutex;
-  queue, domains.(index).trigger, domains.(index).p_count
+  ((queue, domains.(index).trigger, domains.(index).p_count),
+   Domain.get_id @@ Option.get domain_info.domain)
 
 let stop_all () =
   (* for domain = 0 to max_domains - 1 do *)
@@ -167,7 +168,7 @@ let stop_all () =
   for _ = 1 to max_domains do
     (* Clear the process queue *)
     (* Stop the thread *)
-    let stopping_actor = create () in
+    let stopping_actor, _ = create () in
     push_process stopping_actor (fun _ -> raise Stop);
   done;
   for domain = 0 to max_domains - 1 do

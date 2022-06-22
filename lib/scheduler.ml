@@ -5,7 +5,7 @@ module type S = sig
   type t
   type process = unit -> unit
 
-  val create : unit -> t
+  val create : unit -> t * Domain.id
   val push_process : t -> process -> unit
   val wait_for : (unit -> bool) -> unit
   val yield : unit -> unit

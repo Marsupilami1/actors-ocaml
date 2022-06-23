@@ -19,4 +19,11 @@
  (synopsis "A ppx rewritter for ActorsOcaml")
  (description "A ppx rewritter for ActorsOcaml")
  (depends ocaml dune))
-; See the complete stanza docs at https://dune.readthedocs.io/en/stable/dune-files.html#dune-project
+
+(package
+ (name name_resolver)
+ (synopsis "A ppx which resolve names")
+ (description "A ppx which resolve names")
+ (depends ocaml ppxlib dune))
+
+ ; See the complete stanza docs at https://dune.readthedocs.io/en/stable/dune-files.html#dune-project

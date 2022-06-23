@@ -15,63 +15,31 @@ $ xdg-open _build/default/_doc/_html/index.html # to read the documentation, rep
 
 Let's write a simple programs to calculate the fibonacci numbers.
 
-First, we want a method acting like a function `fib : int -> int`. To do this, we create the following module:
+We first want to define an actor `fib`:
 
 ``` ocaml
-module MyMessage = struct
-  type 'a t =
-    |  Fib : int -> int t
-  type method_type = { m : 'a . ('a Promise.t -> 'a) -> 'a t -> 'a }
+open Actorsocaml
+
+let fib = object%actor (self)
+  method fib n =
+    if n < 2 then n
+    else begin
+      let f1 = Promise.await @@ self#fib (n - 1) in
+      let f2 = Promise.await @@ self#fib (n - 2) in
+      f1 + f2
+    end
 end
-
-(* Roundrobin is a predefined scheduler *)
-module MyActor = Actor.Make(Roundrobin)(MyMessage)
 ```
 
+It's just as simple as that!
+Don't forget to add the `actorsocamlppx` library in your `dune` file.
 
-The type `'a t` is the type of our message. It represents our different functions. The return type is `int`, because the type of `Fib n` is `int`.
-We could have define the `flip` function by adding the constructor:
-
-``` ocaml
-    | Flip : ('a -> 'b -> 'c) * 'b * 'a -> 'c t
-```
-
-Once declared, we can define the `fib` function:
+You are now able to send messages to `fib` like so:
 
 ``` ocaml
-let actor_methods =
-  let methods
-    : type a . MyActor.t (* Actor *)
-      -> (a Promise.t -> a) (* forward function, not used here*)
-      -> a MyMessage.t (* message received *)
-      -> a (* return type *)
-    = fun self _ -> function
-      | Fib n ->
-        if n < 2 then n else begin
-          let p1 = MyActor.send self (Fib (n - 1)) in
-          let p2 = MyActor.send self (Fib (n - 2)) in
-          Promise.await p1 + Promise.await p2
-        end
-  in fun self ->
-    {MyMessage.m = fun forward -> methods self forward}
-
-The type annotation is significant, because `MyMessage.t` is a GADT, and we want a function of type `'a . 'a MyMessage.t -> 'a` (In fact, we want a `'a . ('a Promise.t -> 'a) -> 'a MyMessage.t -> 'a`, see the Forward section)
-```
-
-And we can finally create the actor with `MyActor.create`:
-
-``` ocaml
-let actor = MyActor.create actor_methods
-```
-
-The main function could look like:
-
-``` ocaml
-let main _ =
-  let actor = MyActor.create actor_methods in
-  let n = 6 in
-  let p = MyActor.send actor (Fib n) in
-  Printf.printf "fib(%d) = %d\n" n @@ Promise.await p
+let main () =
+  let fib_5 = fib#!fib 5 in
+  Printf.printf "fib(5) = %d\n" (Promise.await fib_5)
   
 let _ = Actor.Main.run main
 ```
@@ -118,76 +86,57 @@ Trying to fill in the same promise twice raises a `Promise__Multiple_Write` erro
 #### Reading
 
 You can get the value of a promise with `await`. It will throw the effect `NotReady p` if the value is not available, so it can then be handled by a scheduler (That's why the call to `Actor.Main.run` is mandatory).
-You can also use `get`, which is blocking.
+You can also use `get`, which is blocking (In fact, it also raises an effect, but a good scheduler should block if it catches it, you don't care if you use one of the predefined schedulers).
 
 Of course, the value will be returned if it is available.
 
 
 ### Actors
-#### Type
 
-An actor is a  bunch of functions and a scheduler, its definition is:
+Actors are OCaml object running in their own domain.
+The easiest way to define an actor is to use the `actorsocamlppx` syntax extension.
+It's goal is to make your life easier, cause you do not want (trust me) to write all the code yourself.
+At this time, you can only use `var` and `methods` in your objects: no inheritance, no private fields.
+So this is a valid actor:
 
 ``` ocaml
-type t = {
-  (* Currently running processes *)
-  processes : process Domainslib.Chan.t;
-  (* Methods *)
-  methods : t -> S.method_type;
-  (* Domain in which the actor is running *)
-  mutable domain : unit Domain.t Option.t
-}
+object%actor
+  val y = 42
+  val get = y
+end
 ```
 
-The `process` type is a simple `unit -> unit`. `S` is the module containing the method type (See the exemple).
+The actor is running in his own thread, it is ready to use.
+You can refer `self` in the definition, see the first example.
 
-#### Creation
+### Send messages
 
-To create an actor, you only need to specify its methods.
-A method is a function which takes an actor (`self`) and a message.
+The methods of the generated actor returns promises, you can call the method `get` of the actor `actor` by writing 
 
-#### Execution
-Actors runs when they are created: it will spawn a new thread and run the scheduler.
-
-Actors are stopped automatically thanks to a hook on the garbarge collector.
+``` ocaml
+actor#!get (* Async call, returns an int Promise.t *)
+actor#.get (* Sync call, returns an int *)
+```
 
 ## Forward
-Let's consider the following actor:
+Let's consider the following actor (taken from `examples/exple_syracuse.ml`):
 
 ``` ocaml
 open Actorsocaml
 
-module MyMessage = struct
-  type 'a t =
-    | Syracuse : int -> int Promise.t t
-  type method_type = { m : 'a . ('a Promise.t -> 'a) -> 'a t -> 'a }
+let actor = object%actor (self)
+  method syracuse n =
+    if n = 1 then 1
+    else begin
+      let next = if n mod 2 = 0 then n / 2 else 3 * n + 1 in
+      Promise.await @@ self#!syracuse next
+    end
 end
 
-module MyActor = Actor.Make(Roundrobin)(MyMessage)
-
-let actor_methods =
-  let methods
-    : type a . MyActor.t
-      -> (a Promise.t -> a)
-      -> a MyMessage.t
-      -> a
-    = fun self _ -> function
-      | Syracuse n ->
-        if n = 1 then
-          Promise.pure 1
-        else begin
-          let next = if n mod 2 = 0 then n / 2 else 3 * n + 1 in
-          Promise.await @@ MyActor.send self (Syracuse(next))
-        end
-  in fun self ->
-    {MyMessage.m = fun forward -> methods self forward}
-
 let main _ =
-  let actor = MyActor.create actor_methods in
-
   let n = 42 in
-  let p = Promise.join @@ MyActor.send actor (Syracuse n) in
-  assert (1 = Promise.await p)
+  let p = Promise.await @@ actor#!syracuse n in
+  assert (1 = p)
 
 let _ = Actor.Main.run main
 ```
@@ -198,21 +147,11 @@ This is very inefficient, as we create many promises that are forgotten immediat
 We could make the following change:
 
 ``` diff
--     Promise.await @@ MyActor.send self (Syracuse(next))
-+     Promise.join @@ MyActor.send self (Syracuse(next))
-```
-This will not decrease the number of promises (it will actually be higher), but the scheduler does not wait for promises to be fulfilled. Instead, we add a callback to each promise to directly fill the next promise. So this program is faster than the previous one
+-     Promise.await @@ self#!syracuse next
++     forward @@ self#!syracuse next
 
-But the faster solution is to use forward:
 
-``` diff
-- = fun self _ -> function
-+ = fun self forward -> function
--     Promise.await @@ MyActor.send self (Syracuse(next))
-+     forward @@ MyActor.send self (Syracuse(next))
-```
-
-The `forward` function provided in the function parameter will delegate the fulfillment of the promise to the called actor.
+The `forward` function, will delegate the fulfillment of the promise to the called actor.
 It will actually unify two promises and stop the function (by raising an exception), so the promise *is* the promise obtained by the `send` call.
 The current promise to fill becomes `Forwarded (Atomic.make p')` where `p'` it the result of `send`.
 

@@ -1,6 +1,7 @@
 (executable
- (libraries actorsocaml)
+ (libraries actorsocaml actorsocamlppx)
  (name exple_pingpong)
+ (preprocess (pps actorsocamlppx))
  (modules exple_pingpong))
 
 (executable
@@ -9,6 +10,7 @@
  (modules exple_ring))
 
 (executable
- (libraries actorsocaml)
+ (libraries actorsocaml actorsocamlppx)
  (name exple_syracuse)
+ (preprocess (pps actorsocamlppx))
  (modules exple_syracuse))

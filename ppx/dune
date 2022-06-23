@@ -2,4 +2,6 @@
  (public_name actorsocamlppx)
  (kind ppx_rewriter)
  (preprocess (pps ppxlib.metaquot))
- (libraries ppxlib actorsocaml))
+ (ppx_runtime_libraries actorsocaml)
+ (libraries ppxlib)
+)

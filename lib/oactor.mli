@@ -3,7 +3,7 @@ type 'a t = Actor of 'a
   constraint 'a = <scheduler : Multiroundrobin.t; domain : Domain.id; ..> [@@ocaml.unboxed]
 
 (** [send actor process] tells [actor] to execute [process ()]. *)
-val send : 'a t -> (unit -> unit) -> unit
+val send : 'a t -> Multiroundrobin.process -> unit
 
 (** [methods actor] returns the methods of [actor]. *)
 val methods : 'a t -> 'a

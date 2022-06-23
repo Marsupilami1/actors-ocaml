@@ -7,6 +7,7 @@ authors: ["Martin Andrieux"]
 depends: [
   "ocaml"
   "dune" {>= "3.1"}
+  "actorsocamlppx"
   "odoc" {with-doc}
 ]
 build: [

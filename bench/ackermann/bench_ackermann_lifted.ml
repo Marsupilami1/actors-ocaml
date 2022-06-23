@@ -6,7 +6,7 @@ module AckMessage = struct
   type method_type = { m : 'a . ('a Promise.t -> 'a) -> 'a t -> 'a }
 end
 
-module AckActor = Actor.Make(Roundrobin)(AckMessage)
+module AckActor = Actor.DefaultActor(AckMessage)
 
 let actor_methods =
   let methods

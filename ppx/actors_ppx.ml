@@ -154,11 +154,11 @@ module Method = struct
           let p, fill = Actorsocaml.Promise.create () in
           let forward p' = Actorsocaml.Promise.unify p p'; raise Actorsocaml.Multiroundrobin.Interrupt in
           Actorsocaml.Oactor.send [%e self]
-            (fun _ -> fill
+            (Actorsocaml.Multiroundrobin.Process(fill, (fun _ ->
                 [%e apply_args meth_field.args @@
                   [%expr [%e Exp.send ~loc:loc
                       ([%expr Actorsocaml.Oactor.methods [%e self]])
-                      (private_name meth_field.name)] forward]]);
+                      (private_name meth_field.name)] forward]])));
           p]
     }
 
@@ -247,6 +247,19 @@ let add_val_definition (val_fields : val_desc list) exp =
   in List.fold_left add_one_definition exp val_fields
 
 
+let resolved_name l =
+  let find_resolve attr = attr.attr_name.txt = "resolved"
+  in
+  (* get the resolved attribute if any *)
+  let resolved_attribute = List.nth_opt (List.filter find_resolve l) 0 in
+  (* extrat the generated name *)
+  Option.bind resolved_attribute (fun attr ->
+      match attr.attr_payload with
+      | PStr(({pstr_desc = Pstr_eval({pexp_desc = Pexp_constant(Pconst_string(s, _, _)); _}, _); _})::[]) ->
+        Some s
+      | _ -> None
+    )
+
 
 
 
@@ -273,7 +286,6 @@ let scheduler_fields =
       (Cfk_concrete(Fresh, [%expr snd [%e val_field_ident]]));
   ]
 
-(* let self = Actor self in meth.expr *)
 let transform =
   object (self)
     inherit Ast_traverse.map as super
@@ -342,7 +354,7 @@ let transform =
           } in
           [%expr
             Domain.DLS.set [%e dls_ident] [%e value];
-            let [@warning "-26"] [%p ident] = Domain.DLS.get [%e dls_ident] in
+            let [@warning "-26"] [%p ident][@resolve] = Domain.DLS.get [%e dls_ident] in
             [%e next]
           ]
         (* val_field <- v *)
@@ -353,6 +365,17 @@ let transform =
             pexp_loc = loc; pexp_attributes = []; pexp_loc_stack = [];
           } in
           [%expr Domain.DLS.set [%e dls_ident] [%e value]]
+        (* x[@resolved "x_270"] *)
+        | {pexp_desc = Pexp_ident({loc = loc; _}); pexp_attributes = l; _} ->
+          let new_name_opt = resolved_name l in
+          if new_name_opt = None then expr
+          else (
+            let new_name = Printf.sprintf "$actor_var_%s" @@ Option.get new_name_opt in
+            {expr with
+             pexp_desc = Pexp_ident(mkloc (Lident new_name) loc);
+             pexp_attributes = [];
+            }
+          )
         | _ -> super#expression expr
       in
       default_loc := prev_default_loc;
@@ -362,4 +385,4 @@ let transform =
 let () =
   Driver.register_transformation
     "actor"
-    ~impl:transform#structure
+    ~impl:(fun s -> transform#structure s)

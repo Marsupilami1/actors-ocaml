@@ -1,15 +1,12 @@
 open Actorsocaml
 
-let x =
-  object%actor
-    val mutable y = 0
-    method set n = y <- n
-    method get = y
-  end
+let a = object%actor
+  val y = 42
+  method get = y
+end
 
-let main _ =
-  x#.set 42;
-  Printf.printf "%d\n" @@ Promise.await @@ x#!get
-
+let main () =
+  let p = a#!get in
+  Printf.printf "a.y = %d\n"  @@ Promise.get p
 
 let _ = Actor.Main.run main

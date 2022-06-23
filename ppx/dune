@@ -3,5 +3,5 @@
  (kind ppx_rewriter)
  (preprocess (pps ppxlib.metaquot))
  (ppx_runtime_libraries actorsocaml)
- (libraries ppxlib)
-)
+ (modules actors_ppx)
+ (libraries ppxlib ))

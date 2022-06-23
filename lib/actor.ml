@@ -19,8 +19,8 @@ module Make(S : Scheduler.S)(M : Message.S) = struct
   let send self message =
     let (p, fill) = Promise.create () in
     let forward p' = Promise.unify p p'; raise S.Interrupt in
-    S.push_process self.scheduler (fun _ ->
-        fill (((self.methods self).m) forward message));
+    S.push_process self.scheduler @@ Process(fill, (fun _ ->
+        ((self.methods self).m) forward message));
     p
 
   let wait_for condition =
@@ -43,14 +43,12 @@ module Main = struct
     open Effect.Deep
     exception Stop
     exception Interrupt
-    type process = unit -> unit
+    type process = Process : (('a -> unit) * (unit -> 'a)) -> process
     type t = {processes : process Domainslib.Chan.t;}
     let push_process fifo process =
       Domainslib.Chan.send fifo.processes process
     let get_process fifo =
       Domainslib.Chan.recv fifo.processes
-    let manage_next_process fifo =
-      get_process fifo ()
     type _ Effect.t += WaitFor : (unit -> bool) -> unit Effect.t
     let wait_for condition =
       perform @@ WaitFor condition
@@ -58,8 +56,9 @@ module Main = struct
     let yield () =
       perform @@ Yield
     let rec loop fifo =
-      match_with manage_next_process fifo {
-        retc = (fun _ -> loop fifo);
+      let Process(fill, exec) = get_process fifo in
+      match_with exec () {
+        retc = (fun v -> fill v; loop fifo);
         exnc = (fun e -> match e with
             | Interrupt -> loop fifo
             | _ -> raise e
@@ -72,7 +71,7 @@ module Main = struct
                 (* So we add a callback to this promise to push the process *)
                 (* back to the queue *)
                 Promise.add_callback p (fun v ->
-                    push_process fifo (fun _ -> continue k v));
+                    push_process fifo (Process(Obj.magic fill, (fun _ -> continue k v))));
                 loop fifo;
             )
           | Promise.Get p -> Some (
@@ -80,21 +79,21 @@ module Main = struct
                 while not (Promise.is_ready p) do
                   Domain.cpu_relax ()
                 done;
-                continue k (Promise.get p);
+                ignore @@ continue k (Promise.get p);
                 loop fifo;
             )
           | Promise.Async f -> Some (
               fun (k : (a, _) continuation) ->
-                push_process fifo f;
-                continue k ()
+                push_process fifo (Process(ignore, f));
+                ignore @@ continue k ()
             )
           | WaitFor condition -> Some (
               fun (k : (a, _) continuation) ->
                 if condition () then
-                  continue k ()
+                  ignore @@ continue k ()
                 else (
-                  push_process fifo (fun _ ->
-                      wait_for condition; continue k ());
+                  push_process fifo (Process(Obj.magic fill, (fun _ ->
+                      wait_for condition; continue k ())));
                   loop fifo
                 )
             )
@@ -104,15 +103,15 @@ module Main = struct
       processes = Domainslib.Chan.make_unbounded ();
     }, Domain.self ()
     let stop fifo =
-      push_process fifo (fun _ -> Gc.full_major (); raise Stop);
+      push_process fifo (Process(ignore, (fun _ -> Gc.full_major (); raise Stop)));
   end
 
   include Make(MainScheduler)(MainMessage)
 
   let run main =
     let fifo = fst @@ MainScheduler.create () in
-    MainScheduler.push_process fifo (fun _ ->
-        main (); MainScheduler.stop fifo);
+    MainScheduler.push_process fifo (Process(ignore, (fun _ ->
+        main (); MainScheduler.stop fifo)));
     (try MainScheduler.loop fifo with
      | MainScheduler.Stop -> ());
     Multiroundrobin.stop_all ()

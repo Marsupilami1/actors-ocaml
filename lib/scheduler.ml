@@ -3,7 +3,7 @@ module type S = sig
   exception Interrupt
 
   type t
-  type process = unit -> unit
+  type process = Process : (('a -> unit) * (unit -> 'a)) -> process
 
   val create : unit -> t * Domain.id
   val push_process : t -> process -> unit

@@ -12,13 +12,13 @@
  (name actorsocaml)
  (synopsis "An actor library for OCaml 5")
  (description "An actor library for OCaml 5")
- (depends ocaml dune))
+ (depends ocaml dune actorsocamlppx))
 
 (package
  (name actorsocamlppx)
  (synopsis "A ppx rewritter for ActorsOcaml")
  (description "A ppx rewritter for ActorsOcaml")
- (depends ocaml dune))
+ (depends ocaml ppxlib dune))
 
 (package
  (name name_resolver)

@@ -9,7 +9,7 @@ exception Interrupt
 let spawned_actors = ref 0
 let max_domains = 7 (* for 8 cores hardware *)
 
-type process = unit -> unit
+type process = Process : (('a -> unit) * (unit -> 'a)) -> process
 type process_queue = process Chan.t
 type trigger = Mutex.t * Condition.t
 
@@ -90,9 +90,9 @@ let domains : domain_info Array.t =
       in
 
       let rec loop () =
-        let process, current_actor_info = get_next_process () in
-        match_with process () {
-          retc = (fun _ -> loop ());
+        let (Process (fill, exec)), current_actor_info = get_next_process () in
+        match_with exec () {
+          retc = (fun v -> fill v; loop ());
           exnc = (fun e -> match e with
               | Interrupt -> loop ()
               | _ -> raise e
@@ -105,28 +105,33 @@ let domains : domain_info Array.t =
                   (* So we add a callback to this promise to push the process *)
                   (* back to the queue *)
                   Promise.add_callback p (fun v ->
-                      push_process current_actor_info.fifo (fun _ -> continue k v));
+                      push_process current_actor_info.fifo
+                        (* The compiler is dumb *)
+                        (Process(Obj.magic(fill), (fun _ -> continue k v)))
+                    );
                   loop ();
               )
             | Promise.Get p -> Some (
                 fun (k : (a, _) continuation) ->
-                  current_actor_info.current <- Some (fun _ -> continue k (Promise.get p));
+                  current_actor_info.current <- Some
+                      (Process((Obj.magic fill), (fun _ -> continue k (Promise.get p))));
                   Mutex.lock @@ fst info.trigger;
                   Atomic.incr @@ info.p_count;
                   Mutex.unlock @@ fst info.trigger
               )
             | Promise.Async f -> Some (
                 fun (k : (a, _) continuation) ->
-                  push_process current_actor_info.fifo f;
-                  continue k ()
+                  push_process current_actor_info.fifo (Process((fun _ -> ()), f));
+                  ignore @@ continue k ()
               )
             | WaitFor condition -> Some (
                 fun (k : (a, _) continuation) ->
                   if condition () then
-                    continue k ()
+                    ignore @@ continue k ()
                   else (
-                    push_process current_actor_info.fifo (fun _ ->
-                        wait_for condition; continue k ());
+                    push_process current_actor_info.fifo
+                      (Process((Obj.magic fill),
+                               (fun _ -> wait_for condition; continue k ())));
                     loop ()
                   )
               )
@@ -169,7 +174,7 @@ let stop_all () =
     (* Clear the process queue *)
     (* Stop the thread *)
     let stopping_actor, _ = create () in
-    push_process stopping_actor (fun _ -> raise Stop);
+    push_process stopping_actor (Process(ignore, (fun _ -> raise Stop)));
   done;
   for domain = 0 to max_domains - 1 do
     try Domain.join (Option.get @@ domains.(domain).domain) with

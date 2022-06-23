@@ -11,7 +11,7 @@ module type S = sig
   type t
 
   (** The type of processes. *)
-  type process = unit -> unit
+  type process = Process : (('a -> unit) * (unit -> 'a)) -> process
 
   (** [create ()] makes a new scheduler. *)
   val create : unit -> t * Domain.id

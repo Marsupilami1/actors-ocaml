@@ -1,4 +1,4 @@
 (executable
- (libraries actorsocaml benchmark)
+ (libraries actorsocaml benchmark eio_main)
  (name bench_fact)
  (modules bench_fact))

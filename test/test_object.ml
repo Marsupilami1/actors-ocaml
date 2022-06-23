@@ -4,7 +4,7 @@ let x =
   object%actor
     val mutable y = 0
     method set n = y <- n
-    method get () = y
+    method get = y
   end
 
 let ping =
@@ -24,7 +24,7 @@ let pong =
 
 let main _ =
   x#.set 42;
-  Printf.printf "%d\n" @@ Promise.await @@ x#!get ();
+  Printf.printf "%d\n" @@ Promise.await @@ x#!get;
   Promise.await @@ ping#!ping pong 10
 
 

@@ -1,7 +1,8 @@
 (* This code is heavily inspired by:
    https://github.com/ocsigen/js_of_ocaml/blob/master/ppx/ppx_js/lib_internal/ppx_js_internal.ml *)
 open Ppxlib
-open Ast_helper open Asttypes
+open Ast_helper
+open Asttypes
 open Parsetree
 
 exception Syntax_error of Location.Error.t
@@ -69,13 +70,13 @@ let split_fields fields =
   in
   List.fold_right worker fields ([] , [])
 
-let field_of_desc ~loc meth_field =
-  {pcf_desc = Pcf_method(meth_field.name,
-                         meth_field.flag,
-                         Cfk_concrete(Fresh, Exp.poly meth_field.expr None));
-   pcf_loc = loc;
-   pcf_attributes = [];
-  }
+let field_of_desc ~loc meth_field = {
+  pcf_desc = Pcf_method(meth_field.name,
+                        meth_field.flag,
+                        Cfk_concrete(Fresh, Exp.poly meth_field.expr None));
+  pcf_loc = loc;
+  pcf_attributes = [];
+}
 
 let dls_name val_field_name = {
   val_field_name with
@@ -96,10 +97,10 @@ let add_DLS_to_val_fields ~loc (val_fields : val_desc list) =
   }
   in List.map wrap_one_val val_fields
 
-let private_name meth_field_name =
-  {meth_field_name with
-   txt = Printf.sprintf "$actor_meth_%s" meth_field_name.txt
-  }
+let private_name meth_field_name = {
+  meth_field_name with
+  txt = Printf.sprintf "$actor_meth_%s" meth_field_name.txt
+}
 
 let add_val_definition (val_fields : val_desc list) exp =
   let add_one_definition exp (field : val_desc) =
@@ -160,25 +161,6 @@ let add_forward e =
     [%e e]
   ]
 
-let add_meth_definition
-    (val_fields : val_desc list)
-    (meth_fields : meth_desc list)
-    exp =
-  let add_one_definition exp (field : meth_desc) =
-    let pattern = {
-      ppat_desc = Ppat_var(private_name field.name);
-      ppat_loc = exp.pexp_loc;
-      ppat_loc_stack = exp.pexp_loc_stack;
-      ppat_attributes = exp.pexp_attributes;
-    } in
-    let loc = exp.pexp_loc in
-    [%expr
-      let [%p pattern] =
-        [%e add_forward @@ add_args field.args (add_val_binding val_fields field.expr)]
-      in [%e exp]
-    ]
-  in List.fold_left add_one_definition exp meth_fields
-
 let ident_of_name ~loc name = {
   pexp_desc = Pexp_ident({txt = Lident name; loc = loc});
   pexp_loc = loc;
@@ -186,17 +168,36 @@ let ident_of_name ~loc name = {
   pexp_loc_stack = [];
 }
 
+let add_self_shadow self_name e =
+  let loc = e.pexp_loc in
+  let self_pattern = Ast_helper.Pat.var { txt = self_name; loc = Location.none } in
+  let self_ident = ident_of_name ~loc:Location.none self_name in
+  [%expr let [@warning "-26"] [%p self_pattern] = Actorsocaml.Oactor.Actor [%e self_ident] in [%e e]]
+
+let make_private self_name val_fields meth_field = {
+  meth_field with
+  name = private_name meth_field.name;
+  flag = Public; (* TODO: solve the "implicitly public method" issue. *)
+  expr =
+    add_self_shadow self_name @@
+    add_forward @@
+    add_args meth_field.args (add_val_binding val_fields meth_field.expr);
+}
+
+
 let make_async_call self_name meth_field =
   let loc = meth_field.name.loc in
   let self = ident_of_name ~loc:loc self_name in
   { meth_field with
-    expr = add_args_var meth_field.args [%expr
+    expr = add_self_shadow self_name @@ add_args_var meth_field.args [%expr
         let p, fill = Actorsocaml.Promise.create () in
-        let forward p' = Promise.unify p p'; raise Actorsocaml.Multiroundrobin.Interrupt in
+        let forward p' = Actorsocaml.Promise.unify p p'; raise Actorsocaml.Multiroundrobin.Interrupt in
         Actorsocaml.Oactor.send [%e self]
           (fun _ -> fill
               [%e apply_args meth_field.args @@
-                [%expr [%e ident_of_name ~loc @@ (private_name meth_field.name).txt] forward]]);
+                [%expr [%e Exp.send ~loc:loc
+                    ([%expr Actorsocaml.Oactor.methods [%e self]])
+                    (private_name meth_field.name)] forward]]);
         p]
   }
 
@@ -208,12 +209,16 @@ let make_sync_call self_name meth_field =
   let self = ident_of_name ~loc:loc self_name in
   { meth_field with
     name = meth_sync_name meth_field.name;
-    expr = add_args_var meth_field.args [%expr
+    expr = add_self_shadow self_name @@ add_args_var meth_field.args [%expr
         if Actorsocaml.Oactor.in_same_domain [%e self] then
-          let forward p' = Promise.await p' in
+          let forward p' = Actorsocaml.Promise.await p' in
           [%e apply_args meth_field.args @@
-            [%expr [%e ident_of_name ~loc
-              @@ (private_name meth_field.name).txt] forward]];
+            [%expr [%e Exp.send ~loc:loc
+                ([%expr Actorsocaml.Oactor.methods [%e self]])
+                (private_name meth_field.name)] forward]
+          ];
+
+
         else
           Actorsocaml.Promise.await @@
           [%e apply_args meth_field.args
@@ -223,14 +228,34 @@ let make_sync_call self_name meth_field =
       ]
   }
 
-let lambda_lift self_name (_val_fields : val_desc list) (meth_fields : meth_desc list) =
+let lambda_lift self_name (val_fields : val_desc list) (meth_fields : meth_desc list) =
   List.concat_map
     (fun field -> [
+         make_private    self_name val_fields field;
          make_async_call self_name field;
          make_sync_call  self_name field;
        ])
     meth_fields
 
+let scheduler_fields =
+  let loc = Location.none in
+  let val_field_name = "$actor_scheduler_and_domain" in
+  let val_field_ident = [%expr [%e ident_of_name ~loc:loc val_field_name]] in [
+    Ast_helper.Cf.val_
+      (make_str val_field_name)
+      Immutable
+      (Cfk_concrete(Fresh, [%expr Actorsocaml.Multiroundrobin.create ()]));
+    Ast_helper.Cf.method_
+      (make_str "scheduler")
+      Public
+      (Cfk_concrete(Fresh, [%expr fst [%e val_field_ident]]));
+    Ast_helper.Cf.method_
+      (make_str "domain")
+      Public
+      (Cfk_concrete(Fresh, [%expr snd [%e val_field_ident]]));
+  ]
+
+(* let self = Actor self in meth.expr *)
 let transform =
   object (self)
     inherit Ast_traverse.map as super
@@ -254,25 +279,17 @@ let transform =
 
           let loc = e.pexp_loc in
           let new_fields =
+            scheduler_fields @
             (List.map (field_of_desc ~loc:loc) @@ lambda_lift self_name val_fields meth_fields)
           in
           [%expr
-            Actorsocaml.Oactor.create (fun [%p {
-                ppat_desc = Ppat_var (make_str self_name);
-                ppat_loc = loc;
-                ppat_attributes = [];
-                ppat_loc_stack = [];
-              }] -> [%e
+            Actorsocaml.Oactor.Actor [%e
                 self#expression @@
-                add_val_definition val_fields @@
-                add_meth_definition val_fields meth_fields @@ {
+                add_val_definition val_fields @@ {
                   e with pexp_desc = Pexp_object {
                     pcstr_fields = new_fields;
-                    pcstr_self = {
-                      class_struct.pcstr_self with
-                      ppat_desc = Ppat_any
-                    }
-                  }}])
+                    pcstr_self = Ast_helper.Pat.var (make_str self_name)
+                  }}]
           ]
         (* object#!method *)
         | [%expr [%e? obj] #! [%e? meth]] as expr ->

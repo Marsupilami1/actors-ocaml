@@ -7,11 +7,14 @@ module type S = sig
       computation. *)
   exception Interrupt
 
+  (** Effect raised by [forward]. *)
+  type _ Stdlib.Effect.t += Forward : ('a Promise.resolver -> unit) -> 'a Stdlib.Effect.t
+
   (** The type of the scheduler. *)
   type t
 
   (** The type of processes. *)
-  type process = Process : (('a -> unit) * (unit -> 'a)) -> process
+  type process = Process : ('a Promise.resolver * (unit -> 'a)) -> process
 
   (** [create ()] makes a new scheduler. *)
   val create : unit -> t * Domain.id

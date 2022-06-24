@@ -15,7 +15,7 @@ let pong =
     method pong ping n =
       Printf.printf "Pong: %d\n%!" n;
       if n <= 0 then ()
-      else forward @@ ping#!ping self (n - 1)
+      else ping#!!ping self (n - 1)
   end
 
 let main _ =

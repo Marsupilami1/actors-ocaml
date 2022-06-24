@@ -43,7 +43,8 @@ module Main = struct
     open Effect.Deep
     exception Stop
     exception Interrupt
-    type process = Process : (('a -> unit) * (unit -> 'a)) -> process
+    type _ Effect.t += Forward : ('a Promise.resolver -> unit) -> 'a Effect.t
+    type process = Process : ('a Promise.resolver * (unit -> 'a)) -> process
     type t = {processes : process Domainslib.Chan.t;}
     let push_process fifo process =
       Domainslib.Chan.send fifo.processes process
@@ -81,6 +82,10 @@ module Main = struct
                 done;
                 ignore @@ continue k (Promise.get p);
                 loop fifo;
+            )
+          | Forward _ -> Some (
+              fun (k : (a, _) continuation) ->
+                discontinue k (Failure "Cannot use forward in Main actor.");
             )
           | Promise.Async f -> Some (
               fun (k : (a, _) continuation) ->

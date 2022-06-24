@@ -5,8 +5,13 @@ let a = object%actor
   method get = y
 end
 
+let b = object%actor
+  val z = 67
+  method get = a#!!get
+end
+
 let main () =
-  let p = a#!get in
+  let p = b#!get in
   Printf.printf "a.y = %d\n"  @@ Promise.get p
 
 let _ = Actor.Main.run main

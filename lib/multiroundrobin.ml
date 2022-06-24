@@ -5,11 +5,12 @@ module Chan = Domainslib.Chan
 
 exception Stop
 exception Interrupt
+type _ Stdlib.Effect.t += Forward : ('a Promise.resolver -> unit) -> 'a Stdlib.Effect.t
 
 let spawned_actors = ref 0
 let max_domains = 7 (* for 8 cores hardware *)
 
-type process = Process : (('a -> unit) * (unit -> 'a)) -> process
+type process = Process : ('a Promise.resolver * (unit -> 'a)) -> process
 type process_queue = process Chan.t
 type trigger = Mutex.t * Condition.t
 
@@ -118,6 +119,11 @@ let domains : domain_info Array.t =
                   Mutex.lock @@ fst info.trigger;
                   Atomic.incr @@ info.p_count;
                   Mutex.unlock @@ fst info.trigger
+              )
+            | Forward f -> Some (
+                fun (k : (a, _) continuation) ->
+                  f (Obj.magic fill);
+                  discontinue k Interrupt;
               )
             | Promise.Async f -> Some (
                 fun (k : (a, _) continuation) ->

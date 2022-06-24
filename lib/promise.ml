@@ -11,6 +11,8 @@ type 'a status =
   | Forwarded of 'a t Atomic.t
 and 'a t = 'a status Atomic.t
 
+type 'a resolver = 'a -> unit
+
 let rec find_leader p =
   let x = Atomic.get p in
   match Atomic.get x with

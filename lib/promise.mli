@@ -8,6 +8,9 @@
 (** The type of promises. *)
 type 'a t
 
+(** Resolver for promise, needed to fulfill. *)
+type 'a resolver = 'a -> unit
+
 (** Effect raised by the {!await} function. *)
 type _ Effect.t += NotReady : 'a t -> 'a Effect.t
 
@@ -24,7 +27,7 @@ exception Promise__Multiple_Write
 
 (** [create ()] creates an empty promise, it returns the
     promise and a [fill] function *)
-val create : unit -> 'a t * ('a -> unit)
+val create : unit -> 'a t * 'a resolver
 
 (** [pure v] creates a promise with the value [v]
     directly available. *)

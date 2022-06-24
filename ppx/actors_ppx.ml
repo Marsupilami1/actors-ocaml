@@ -81,9 +81,9 @@ module Method = struct
     pcf_attributes = [];
   }
 
-  let add_forward e =
+  let add_unit_arg e =
     let loc = e.pexp_loc in
-    [%expr fun [%p Pat.var (make_str "forward")] ->
+    [%expr fun () ->
       [%e e]
     ]
 
@@ -142,7 +142,7 @@ module Method = struct
     flag = Public; (* TODO: solve the "implicitly public method" issue. *)
     expr =
       add_self_shadow self_name @@
-      add_forward @@
+      add_unit_arg @@
       add_args meth_field.args (add_val_binding val_fields meth_field.expr);
   }
 
@@ -152,19 +152,17 @@ module Method = struct
       meth_field with
       expr = add_self_shadow self_name @@ add_args_var meth_field.args [%expr
           let p, fill = Actorsocaml.Promise.create () in
-          let forward p' = Actorsocaml.Promise.unify p p'; raise Actorsocaml.Multiroundrobin.Interrupt in
           Actorsocaml.Oactor.send [%e self]
             (Actorsocaml.Multiroundrobin.Process(fill, (fun _ ->
                 [%e apply_args meth_field.args @@
                   [%expr [%e Exp.send ~loc:loc
                       ([%expr Actorsocaml.Oactor.methods [%e self]])
-                      (private_name meth_field.name)] forward]])));
+                      (private_name meth_field.name)] ()]])));
           p]
     }
 
   let meth_sync_name name =
     Loc.map ~f:(fun s -> s ^ "_sync") name
-
 
   let make_sync_call self_name meth_field =
     let loc = meth_field.name.loc in
@@ -173,11 +171,10 @@ module Method = struct
       name = meth_sync_name meth_field.name;
       expr = add_self_shadow self_name @@ add_args_var meth_field.args [%expr
           if Actorsocaml.Oactor.in_same_domain [%e self] then
-            let forward p' = Actorsocaml.Promise.await p' in
             [%e apply_args meth_field.args @@
               [%expr [%e Exp.send ~loc:loc
                   ([%expr Actorsocaml.Oactor.methods [%e self]])
-                  (private_name meth_field.name)] forward]
+                  (private_name meth_field.name)] ()]
             ]
           else
             Actorsocaml.Promise.await @@
@@ -188,12 +185,31 @@ module Method = struct
         ]
     }
 
+  let meth_forward_name name =
+    Loc.map ~f:(fun s -> s ^ "_forward") name
+
+  let make_forward_call self_name meth_field =
+    let loc = meth_field.name.loc in
+    let self = ident_of_name ~loc:loc self_name in {
+      meth_field with
+      name = meth_forward_name meth_field.name;
+      expr = add_self_shadow self_name @@ add_args_var meth_field.args [%expr
+          Effect.perform @@ Actorsocaml.Multiroundrobin.Forward (fun forward -> Actorsocaml.Oactor.send [%e self]
+            (Actorsocaml.Multiroundrobin.Process(forward, (fun _ ->
+                [%e apply_args meth_field.args @@
+                  [%expr [%e Exp.send ~loc:loc
+                      ([%expr Actorsocaml.Oactor.methods [%e self]])
+                      (private_name meth_field.name)] ()]]))));
+          ]
+    }
+
   let lambda_lift self_name (val_fields : val_desc list) (meth_fields : meth_desc list) =
     List.concat_map
       (fun field -> [
-           make_private    self_name val_fields field;
-           make_async_call self_name field;
-           make_sync_call  self_name field;
+           make_private      self_name val_fields field;
+           make_async_call   self_name field;
+           make_sync_call    self_name field;
+           make_forward_call self_name field;
          ])
       meth_fields
 end
@@ -259,13 +275,6 @@ let resolved_name l =
         Some s
       | _ -> None
     )
-
-
-
-
-
-
-
 
 
 let scheduler_fields =
@@ -339,6 +348,16 @@ let transform =
             pexp_desc =
               Pexp_send([%expr Actorsocaml.Oactor.methods [%e obj]],
                         Method.meth_sync_name @@ make_str @@ exp_to_string meth)
+          } in
+          [%expr [%e application]]
+        (* obejct#!!method *)
+        | [%expr [%e? obj] #!! [%e? meth]] as expr ->
+          let loc = expr.pexp_loc in
+          let application = {
+            expr with
+            pexp_desc =
+              Pexp_send([%expr Actorsocaml.Oactor.methods [%e obj]],
+                        Method.meth_forward_name @@ make_str @@ exp_to_string meth)
           } in
           [%expr [%e application]]
         (* val_field <- v; ... *)

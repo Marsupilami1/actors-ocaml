@@ -1,4 +1,4 @@
-(lang dune 3.1)
+(lang dune 2.9)
 
 (name actorsocaml)
 
@@ -12,7 +12,7 @@
  (name actorsocaml)
  (synopsis "An actor library for OCaml 5")
  (description "An actor library for OCaml 5")
- (depends ocaml dune actorsocamlppx))
+ (depends ocaml dune))
 
 (package
  (name actorsocamlppx)

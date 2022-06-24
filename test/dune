@@ -6,7 +6,7 @@
           test_actor test_promise))
 
 (test
- (libraries actorsocamlppx actorsocaml)
+ (libraries actorsocaml)
  (name test_object)
- (preprocess (pps actorsocamlppx))
+ (preprocess (staged_pps actorsocamlppx))
  (modules test_object))

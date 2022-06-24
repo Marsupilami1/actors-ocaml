@@ -4,4 +4,4 @@
  (preprocess (pps ppxlib.metaquot))
  (ppx_runtime_libraries actorsocaml)
  (modules actors_ppx)
- (libraries ppxlib ))
+ (libraries ppxlib))

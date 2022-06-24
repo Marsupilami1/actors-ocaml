@@ -1,21 +1,27 @@
 (* This code is heavily inspired by:
    https://github.com/ocsigen/js_of_ocaml/blob/master/ppx/ppx_js/lib_internal/ppx_js_internal.ml *)
-open Ppxlib
-open Ast_helper
-open Asttypes
-open Parsetree
+(* open Ppxlib *)
+open Astlib.Ast_500.Asttypes
+open Astlib.Ast_500.Parsetree
 
-exception Syntax_error of Location.Error.t
+open Ast_mapper
 
-let make_exception ~loc ~sub str = Syntax_error (Location.Error.make ~loc ~sub str)
-
-
-let raise_errorf ~loc fmt =
-  Printf.ksprintf (fun str -> make_exception ~loc ~sub:[] str |> raise) fmt
 
 let mkloc txt loc = { txt; loc }
 
 let mknoloc txt = { txt; loc = Location.none }
+
+let mk_pat_var name = {
+  ppat_desc = Ppat_var name;
+  ppat_loc = name.loc;
+  ppat_loc_stack = []; ppat_attributes = []
+}
+
+let mk_send ?(loc=Location.none) e lbl =
+  {pexp_desc = Pexp_send(e, lbl);
+   pexp_loc = loc;
+   pexp_attributes = []; pexp_loc_stack = []
+  }
 
 let make_str ?loc s =
   match loc with
@@ -26,10 +32,8 @@ let exp_to_string = function
   | { pexp_desc = Pexp_ident { txt = Longident.Lident s; _ }; _ } -> s
   | { pexp_desc = Pexp_construct ({ txt = Longident.Lident s; _ }, None); _ }
     when String.length s > 0 && s.[0] >= 'A' && s.[0] <= 'Z' -> "_" ^ s
-  | { pexp_loc; _ } ->
-    raise_errorf
-      ~loc:pexp_loc
-      "Actors methods or attributes can only be simple identifiers."
+  |  _ ->
+    failwith "Actors methods or attributes can only be simple identifiers."
 
 let ident_of_name ~loc name = {
   pexp_desc = Pexp_ident({txt = Lident name; loc = loc});
@@ -76,7 +80,13 @@ module Method = struct
   let field_of_desc ~loc meth_field = {
     pcf_desc = Pcf_method(meth_field.name,
                           meth_field.flag,
-                          Cfk_concrete(Fresh, Exp.poly meth_field.expr None));
+                          Cfk_concrete(Fresh, {
+                              pexp_desc = Pexp_poly(meth_field.expr, None);
+                              pexp_loc = loc;
+                              pexp_attributes = []; pexp_loc_stack =[]
+                            }));
+
+    (* Exp.poly meth_field.expr None)); *)
     pcf_loc = loc;
     pcf_attributes = [];
   }
@@ -99,15 +109,19 @@ module Method = struct
     | _::ps ->
       let loc = exp.pexp_loc in
       let arg = {loc = loc; txt = Printf.sprintf "var_%d" i} in
-      [%expr fun [%p Pat.var arg] -> [%e add_args_var ~i:(i+1) ps exp]]
+      [%expr fun [%p mk_pat_var arg] -> [%e add_args_var ~i:(i+1) ps exp]]
 
   let rec apply_args ?(i = 0) args_list exp =
     match args_list with
     | [] -> exp
     | _::ps ->
       let loc = exp.pexp_loc in
-      let arg = {loc = loc; txt = Lident(Printf.sprintf "var_%d" i)} in
-      apply_args ~i:(i+1) ps [%expr [%e exp] [%e Exp.ident arg]]
+      let arg = {loc = loc; txt = Longident.Lident(Printf.sprintf "var_%d" i)} in
+      apply_args ~i:(i+1) ps [%expr [%e exp] [%e {
+          pexp_desc = (Pexp_ident arg);
+          pexp_loc = arg.loc;
+          pexp_attributes = []; pexp_loc_stack = []
+        }]]
 
   let private_name meth_field_name = {
     meth_field_name with
@@ -116,9 +130,12 @@ module Method = struct
 
   let add_self_shadow self_name e =
     let loc = e.pexp_loc in
-    let self_pattern = Ast_helper.Pat.var { txt = self_name; loc = Location.none } in
+    let self_pattern = mk_pat_var { txt = self_name; loc = Location.none } in
     let self_ident = ident_of_name ~loc:Location.none self_name in
-    [%expr let [@warning "-26"] [%p self_pattern] = Actorsocaml.Oactor.Actor [%e self_ident] in [%e e]]
+    [%expr
+      let [%p self_pattern] =
+        Actorsocaml.Oactor.Actor [%e self_ident]
+      in [%e e]]
 
   let add_val_binding (val_fields : val_desc list) exp =
     let add_one_binding exp (field : val_desc) =
@@ -154,15 +171,17 @@ module Method = struct
           let p, fill = Actorsocaml.Promise.create () in
           Actorsocaml.Oactor.send [%e self]
             (Actorsocaml.Multiroundrobin.Process(fill, (fun _ ->
-                [%e apply_args meth_field.args @@
-                  [%expr [%e Exp.send ~loc:loc
-                      ([%expr Actorsocaml.Oactor.methods [%e self]])
-                      (private_name meth_field.name)] ()]])));
+                 [%e apply_args meth_field.args @@
+                   [%expr [%e mk_send ~loc:loc
+                       ([%expr Actorsocaml.Oactor.methods [%e self]])
+                       (private_name meth_field.name)] ()]])));
           p]
     }
 
-  let meth_sync_name name =
-    Loc.map ~f:(fun s -> s ^ "_sync") name
+  let meth_sync_name name = {
+    name with
+    txt = name.txt ^ "_sync"
+  }
 
   let make_sync_call self_name meth_field =
     let loc = meth_field.name.loc in
@@ -172,7 +191,7 @@ module Method = struct
       expr = add_self_shadow self_name @@ add_args_var meth_field.args [%expr
           if Actorsocaml.Oactor.in_same_domain [%e self] then
             [%e apply_args meth_field.args @@
-              [%expr [%e Exp.send ~loc:loc
+              [%expr [%e mk_send ~loc:loc
                   ([%expr Actorsocaml.Oactor.methods [%e self]])
                   (private_name meth_field.name)] ()]
             ]
@@ -185,8 +204,10 @@ module Method = struct
         ]
     }
 
-  let meth_forward_name name =
-    Loc.map ~f:(fun s -> s ^ "_forward") name
+  let meth_forward_name name = {
+    name with
+    txt = name.txt ^ "_forward"
+  }
 
   let make_forward_call self_name meth_field =
     let loc = meth_field.name.loc in
@@ -194,13 +215,14 @@ module Method = struct
       meth_field with
       name = meth_forward_name meth_field.name;
       expr = add_self_shadow self_name @@ add_args_var meth_field.args [%expr
-          Effect.perform @@ Actorsocaml.Multiroundrobin.Forward (fun forward -> Actorsocaml.Oactor.send [%e self]
-            (Actorsocaml.Multiroundrobin.Process(forward, (fun _ ->
-                [%e apply_args meth_field.args @@
-                  [%expr [%e Exp.send ~loc:loc
-                      ([%expr Actorsocaml.Oactor.methods [%e self]])
-                      (private_name meth_field.name)] ()]]))));
-          ]
+          Effect.perform @@ Actorsocaml.Multiroundrobin.Forward
+            (fun forward -> Actorsocaml.Oactor.send [%e self]
+                (Actorsocaml.Multiroundrobin.Process(forward, (fun _ ->
+                     [%e apply_args meth_field.args @@
+                       [%expr [%e mk_send ~loc:loc
+                           ([%expr Actorsocaml.Oactor.methods [%e self]])
+                           (private_name meth_field.name)] ()]]))));
+        ]
     }
 
   let lambda_lift self_name (val_fields : val_desc list) (meth_fields : meth_desc list) =
@@ -275,6 +297,18 @@ let resolved_name l =
         Some s
       | _ -> None
     )
+let defined_name l =
+  let find_resolve attr = attr.attr_name.txt = "defined"
+  in
+  (* get the resolved attribute if any *)
+  let resolved_attribute = List.nth_opt (List.filter find_resolve l) 0 in
+  (* extrat the generated name *)
+  Option.bind resolved_attribute (fun attr ->
+      match attr.attr_payload with
+      | PStr(({pstr_desc = Pstr_eval({pexp_desc = Pexp_constant(Pconst_string(s, _, _)); _}, _); _})::[]) ->
+        Some s
+      | _ -> None
+    )
 
 
 let scheduler_fields =
@@ -295,113 +329,152 @@ let scheduler_fields =
       (Cfk_concrete(Fresh, [%expr snd [%e val_field_ident]]));
   ]
 
-let transform =
-  object (self)
-    inherit Ast_traverse.map as super
+(* let transform = *)
+(*   object (self) *)
+(*     inherit Ast_traverse.map as super *)
 
-    method! expression expr =
-      let prev_default_loc = !default_loc in
-      default_loc := expr.pexp_loc;
-      (* let { pexp_attributes; _ } = expr in *)
-      let new_expr =
-        match expr with
-        (* object%actor ... end *)
-        | [%expr [%actor [%e? {pexp_desc = Pexp_object class_struct; _} as e]]] ->
-          (* get all `val` and `method` fields *)
-          let val_fields, meth_fields = split_fields class_struct.pcstr_fields in
+(*     method! expression expr = *)
+(*       let prev_default_loc = !default_loc in *)
+(*       default_loc := expr.pexp_loc; *)
+(*       (\* let { pexp_attributes; _ } = expr in *\) *)
+(*       let new_expr = *)
+(*       in *)
+(*       default_loc := prev_default_loc; *)
+(*       new_expr *)
+(*   end *)
 
-          let self_name = begin
-            match class_struct.pcstr_self.ppat_desc with
-            | Ppat_var name -> name.txt (* object (self) ... end *)
-            | _ -> "_self" (* object ... end *)
-          end in
 
-          let loc = e.pexp_loc in
-          let new_fields =
-            scheduler_fields @
-            (List.map (Method.field_of_desc ~loc:loc) @@ Method.lambda_lift self_name val_fields meth_fields)
-          in
-          [%expr
-            Actorsocaml.Oactor.Actor [%e
-              self#expression @@
-              add_val_definition val_fields @@ {
-                e with pexp_desc = Pexp_object {
-                  pcstr_fields = new_fields;
-                  pcstr_self = Ast_helper.Pat.var (make_str self_name)
-                }}]
-          ]
-        (* object#!method *)
-        | [%expr [%e? obj] #! [%e? meth]] as expr ->
-          let loc = expr.pexp_loc in
-          let application = {
-            expr with
-            pexp_desc =
-              Pexp_send([%expr Actorsocaml.Oactor.methods [%e obj]],
-                        make_str @@ exp_to_string meth)
-          } in
-          [%expr [%e application]]
-        (* object#.method *)
-        | [%expr [%e? obj] #. [%e? meth]] as expr ->
-          let loc = expr.pexp_loc in
-          let application = {
-            expr with
-            pexp_desc =
-              Pexp_send([%expr Actorsocaml.Oactor.methods [%e obj]],
-                        Method.meth_sync_name @@ make_str @@ exp_to_string meth)
-          } in
-          [%expr [%e application]]
-        (* obejct#!!method *)
-        | [%expr [%e? obj] #!! [%e? meth]] as expr ->
-          let loc = expr.pexp_loc in
-          let application = {
-            expr with
-            pexp_desc =
-              Pexp_send([%expr Actorsocaml.Oactor.methods [%e obj]],
-                        Method.meth_forward_name @@ make_str @@ exp_to_string meth)
-          } in
-          [%expr [%e application]]
-        (* val_field <- v; ... *)
-        | [%expr [%e? {pexp_desc = Pexp_setinstvar(lbl, value); _} as e]; [%e? next]] ->
-          let loc = e.pexp_loc in
-          let dls_ident = {
-            pexp_desc = Pexp_ident {txt = Lident (dls_name lbl).txt; loc};
-            pexp_loc = loc; pexp_attributes = []; pexp_loc_stack = [];
-          } in
-          let ident = {
-            ppat_desc = Ppat_var lbl;
-            ppat_loc = loc; ppat_attributes = []; ppat_loc_stack = [];
-          } in
-          [%expr
-            Domain.DLS.set [%e dls_ident] [%e value];
-            let [@warning "-26"] [%p ident][@resolve] = Domain.DLS.get [%e dls_ident] in
-            [%e next]
-          ]
-        (* val_field <- v *)
-        | {pexp_desc = Pexp_setinstvar(lbl, value); _} as e ->
-          let loc = e.pexp_loc in
-          let dls_ident = {
-            pexp_desc = Pexp_ident {txt = Lident (dls_name lbl).txt; loc};
-            pexp_loc = loc; pexp_attributes = []; pexp_loc_stack = [];
-          } in
-          [%expr Domain.DLS.set [%e dls_ident] [%e value]]
-        (* x[@resolved "x_270"] *)
-        | {pexp_desc = Pexp_ident({loc = loc; _}); pexp_attributes = l; _} ->
-          let new_name_opt = resolved_name l in
-          if new_name_opt = None then expr
-          else (
-            let new_name = Printf.sprintf "$actor_var_%s" @@ Option.get new_name_opt in
-            {expr with
-             pexp_desc = Pexp_ident(mkloc (Lident new_name) loc);
-             pexp_attributes = [];
-            }
-          )
-        | _ -> super#expression expr
-      in
-      default_loc := prev_default_loc;
-      new_expr
-  end
+let expr_Actor (mapper : mapper) expr = match expr with
+  (* object%actor ... end *)
+  | [%expr [%actor [%e? {pexp_desc = Pexp_object class_struct; _} as e]]] ->
+    (* get all `val` and `method` fields *)
+    let val_fields, meth_fields = split_fields class_struct.pcstr_fields in
+
+    let self_name = begin
+      match class_struct.pcstr_self.ppat_desc with
+      | Ppat_var name -> name.txt (* object (self) ... end *)
+      | _ -> "_self" (* object ... end *)
+    end in
+
+    let loc = e.pexp_loc in
+    let new_fields =
+      scheduler_fields @
+      (List.map (Method.field_of_desc ~loc:loc) @@ Method.lambda_lift self_name val_fields meth_fields)
+    in
+    [%expr
+      Actorsocaml.Oactor.Actor [%e
+        mapper.expr mapper @@
+        add_val_definition val_fields @@ {
+          e with pexp_desc = Pexp_object {
+            pcstr_fields = new_fields;
+            pcstr_self = mk_pat_var (make_str self_name)
+          }}]
+    ]
+  (* object#!method *)
+  | [%expr [%e? obj] #! [%e? meth]] as expr ->
+    let loc = expr.pexp_loc in
+    let application = {
+      expr with
+      pexp_desc =
+        Pexp_send([%expr Actorsocaml.Oactor.methods [%e obj]],
+                  make_str @@ exp_to_string meth)
+    } in
+    [%expr [%e application]]
+  (* object#.method *)
+  | [%expr [%e? obj] #. [%e? meth]] as expr ->
+    let loc = expr.pexp_loc in
+    let application = {
+      expr with
+      pexp_desc =
+        Pexp_send([%expr Actorsocaml.Oactor.methods [%e obj]],
+                  Method.meth_sync_name @@ make_str @@ exp_to_string meth)
+    } in
+    [%expr [%e application]]
+  (* obejct#!!method *)
+  | [%expr [%e? obj] #!! [%e? meth]] as expr ->
+    let loc = expr.pexp_loc in
+    let application = {
+      expr with
+      pexp_desc =
+        Pexp_send([%expr Actorsocaml.Oactor.methods [%e obj]],
+                  Method.meth_forward_name @@ make_str @@ exp_to_string meth)
+    } in
+    [%expr [%e application]]
+  (* val_field <- v; ... *)
+  | [%expr [%e? {pexp_desc = Pexp_setinstvar(lbl, value); _} as e]; [%e? next]] ->
+    let loc = e.pexp_loc in
+    let dls_ident = {
+      pexp_desc = Pexp_ident {txt = Lident (dls_name lbl).txt; loc};
+      pexp_loc = loc; pexp_attributes = []; pexp_loc_stack = [];
+    } in
+    let ident = {
+      ppat_desc = Ppat_var lbl;
+      ppat_loc = loc; ppat_attributes = []; ppat_loc_stack = [];
+    } in
+    [%expr
+      Domain.DLS.set [%e dls_ident] [%e value];
+      let [@warning "-26"] [%p ident][@resolve] = Domain.DLS.get [%e dls_ident] in
+      [%e next]
+    ]
+  (* val_field <- v *)
+  | {pexp_desc = Pexp_setinstvar(lbl, value); _} as e ->
+    let loc = e.pexp_loc in
+    let dls_ident = {
+      pexp_desc = Pexp_ident {txt = Lident (dls_name lbl).txt; loc};
+      pexp_loc = loc; pexp_attributes = []; pexp_loc_stack = [];
+    } in
+    [%expr Domain.DLS.set [%e dls_ident] [%e value]]
+  | e -> default_mapper.expr mapper e
+
+
+let expr_DLS_adder (mapper : mapper) expr =
+  match expr with
+  (* x[@resolved "x_270"] *)
+  | {pexp_desc = Pexp_ident({loc = loc; _}); pexp_attributes = l; _} ->
+    let new_name_opt = resolved_name l in
+    if new_name_opt = None then expr
+    else (
+      let new_name = Printf.sprintf "$actor_var_%s" @@ Option.get new_name_opt in
+      {expr with
+       pexp_desc = Pexp_ident(mkloc (Longident.Lident new_name) loc);
+       pexp_attributes = [];
+      }
+    )
+  | e -> default_mapper.expr mapper e
+
+let pat_DLS_adder (mapper : mapper) pat =
+  match pat with
+  | { ppat_desc = Ppat_var s;
+      ppat_attributes = l; _
+    } as p ->
+    let new_name_opt = defined_name l in
+    if new_name_opt = None then default_mapper.pat mapper p
+    else (
+      let new_name = Printf.sprintf "$actor_var_%s" @@ Option.get new_name_opt in
+      { p with
+        ppat_desc = Ppat_var({txt = new_name; loc = s.loc});
+        ppat_attributes = [];
+      }
+    )
+  | p -> default_mapper.pat mapper p
+
+let actor_mapper = {
+  default_mapper with
+  expr = expr_Actor
+}
+
+let dls_adder = {
+  default_mapper with
+  expr = expr_DLS_adder;
+  pat = pat_DLS_adder
+}
 
 let () =
-  Driver.register_transformation
+  Ppxlib.Driver.register_transformation_using_ocaml_current_ast
     "actor"
-    ~impl:(fun s -> transform#structure s)
+    ~impl:(fun s ->
+        s
+        |> actor_mapper.structure actor_mapper
+        |> Name_resolver.M.impl
+        |> dls_adder.structure dls_adder
+      )

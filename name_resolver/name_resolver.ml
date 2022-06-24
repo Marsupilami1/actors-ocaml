@@ -30,10 +30,10 @@ let pat (type a) mapper (typat : a Typedtree.general_pattern) =
 let expr mapper (tyexp : Typedtree.expression) =
   match tyexp.exp_desc with
   | Typedtree.Texp_ident (Pident id as p,_,_) ->
-    (* Format.eprintf "Resolving %a with def %a@."
-     *   Ident.print id
-     *   (Format.pp_print_list Format.pp_print_string)
-     *   (List.map (fun x -> x.Parsetree.attr_name.txt) (Env.find_value p tyexp.exp_env).val_attributes); *)
+    (* Format.eprintf "Resolving %a with def %a@." *)
+    (*   Ident.print id *)
+    (*   (Format.pp_print_list Format.pp_print_string) *)
+    (*   (List.map (fun x -> x.Parsetree.attr_name.txt) (Env.find_value p tyexp.exp_env).val_attributes); *)
     let v = mapper0.expr mapper tyexp in
     if to_resolve tyexp.exp_env p then
       let loc = tyexp.exp_loc in
@@ -48,4 +48,4 @@ module M = Untyper.Make(struct
     let name = "resolver"
     let untype = name_resolver_mapper
   end)
-let () = M.register ()
+(* let () = M.register () *)

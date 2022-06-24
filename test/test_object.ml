@@ -17,14 +17,10 @@ open Actorsocaml
 (*     self#field *)
 (* end *)
 
-let o (x[@resolve]) =
-  x
-
-let _ = object%actor end
 
 let main () =
-  Promise.await @@ Promise.pure ();
-  print_int @@ o 42
+  let (x[@resolve]) = 42 in
+  Printf.printf "%d\n%!" @@ x
 (* let p = b#!get in *)
 (* Printf.printf "a.y = %d\n"  @@ Promise.get p *)
 (* Printf.printf "foo = %d\n"  @@ foo#field *)

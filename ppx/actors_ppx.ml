@@ -432,31 +432,29 @@ let expr_DLS_adder (mapper : mapper) expr =
   (* x[@resolved "x_270"] *)
   | {pexp_desc = Pexp_ident({loc = loc; _}); pexp_attributes = l; _} ->
     let new_name_opt = resolved_name l in
-    if new_name_opt = None then expr
+    if new_name_opt = None then default_mapper.expr mapper expr
     else (
       let new_name = Printf.sprintf "$actor_var_%s" @@ Option.get new_name_opt in
-      {expr with
+      [%expr Domain.DLS.get [%e {expr with
        pexp_desc = Pexp_ident(mkloc (Longident.Lident new_name) loc);
        pexp_attributes = [];
-      }
+      }]]
     )
-  | e -> default_mapper.expr mapper e
-
-let pat_DLS_adder (mapper : mapper) pat =
-  match pat with
-  | { ppat_desc = Ppat_var s;
+  | [%expr let [%p? { ppat_desc = Ppat_var s;
       ppat_attributes = l; _
-    } as p ->
+    } as p] = [%e? v] in [%e? e]
+  ] ->
     let new_name_opt = defined_name l in
-    if new_name_opt = None then default_mapper.pat mapper p
+    if new_name_opt = None then default_mapper.expr mapper expr
     else (
       let new_name = Printf.sprintf "$actor_var_%s" @@ Option.get new_name_opt in
-      { p with
+      let loc = expr.pexp_loc in
+      [%expr let [%p { p with
         ppat_desc = Ppat_var({txt = new_name; loc = s.loc});
         ppat_attributes = [];
-      }
+      }] = Domain.DLS.new_key (fun _ -> [%e v]) in [%e mapper.expr mapper e]]
     )
-  | p -> default_mapper.pat mapper p
+  | e -> default_mapper.expr mapper e
 
 let actor_mapper = {
   default_mapper with
@@ -466,7 +464,6 @@ let actor_mapper = {
 let dls_adder = {
   default_mapper with
   expr = expr_DLS_adder;
-  pat = pat_DLS_adder
 }
 
 let () =

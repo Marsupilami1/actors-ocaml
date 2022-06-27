@@ -10,6 +10,18 @@ $ dune build @doc
 $ xdg-open _build/default/_doc/_html/index.html # to read the documentation, replace xdg-open by your favorite web browser
 ```
 
+## Use Actors-OCaml in your code
+Your `dune` file may look like
+
+``` dune
+(executable
+ (name myproject)
+ (libraries actorsocaml)
+ (preprocess (staged_ppx actorsocamlppx)))
+```
+
+Be sure to use `staged_ppx` and not `ppx`. It's mandatory because of a call to the type checker.
+
 
 ## Write a program using actors
 
@@ -116,7 +128,12 @@ The methods of the generated actor returns promises, you can call the method `ge
 ``` ocaml
 actor#!get (* Async call, returns an int Promise.t *)
 actor#.get (* Sync call, returns an int *)
+actor#!!get (* Forward call, see the forward section *)
 ```
+
+### Mutable fields
+
+You can of course use mutable fields in your actors, just use the standard syntax `field <- value`.
 
 ## Forward
 Let's consider the following actor (taken from `examples/exple_syracuse.ml`):
@@ -150,6 +167,7 @@ We could make the following change:
 -     Promise.await @@ self#!syracuse next
 +     forward @@ self#!syracuse next
 
+```
 
 The `forward` function, will delegate the fulfillment of the promise to the called actor.
 It will actually unify two promises and stop the function (by raising an exception), so the promise *is* the promise obtained by the `send` call.
@@ -158,4 +176,4 @@ The current promise to fill becomes `Forwarded (Atomic.make p')` where `p'` it t
 We use a `union-find` like structure for the forwarded promises, with path compression.
 
 ## Exemples
-See `test/test_{actor; pingpong; ring; condition; bench; syracuse}.ml`
+See `example/exple_{pingpong; syracuse}.ml`

@@ -3,22 +3,22 @@
 * Ackerman
 Note that actor creation is not part of the bench.
 ** Await: 5.23/s
-Latencies for 100 iterations of "Ackerman(3, 4), await":
-Ackerman(3, 4), await: 19.22 WALL (18.92 usr +  0.21 sys = 19.12 CPU) @  5.23/s (n=100)
+Latencies for 50 iterations of "Ackerman(3, 4), await":
+Ackerman(3, 4), await: 11.29 WALL (11.44 usr +  0.29 sys = 11.73 CPU) @  4.26/s (n=50)
                         Rate Ackerman(3, 4), await
-Ackerman(3, 4), await 5.23/s                    --
+Ackerman(3, 4), await 4.26/s                    --
 
 ** Forward: 12.1/s
-Latencies for 100 iterations of "Ackerman(3, 4), forward":
-Ackerman(3, 4), forward:  8.25 WALL ( 8.12 usr +  0.14 sys =  8.26 CPU) @ 12.10/s (n=100)
-                          Rate Ackerman(3, 4), forward
-Ackerman(3, 4), forward 12.1/s                      --
+Latencies for 100000 iterations of "Ackerman(3, 4), awaitb":
+Ackerman(3, 4), awaitb:  0.37 WALL ( 0.56 usr +  0.11 sys =  0.66 CPU) @ 150515.59/s (n=100000)
+                           Rate Ackerman(3, 4), awaitb
+Ackerman(3, 4), awaitb 150516/s                     --
 
 ** Forward + lifted promise 306/s
-Latencies for 1000 iterations of "Ackerman(3, 4), lifted":
-Ackerman(3, 4), lifted:  1.62 WALL ( 3.26 usr +  0.01 sys =  3.27 CPU) @ 305.84/s (n=1000)
-                        Rate Ackerman(3, 4), lifted
-Ackerman(3, 4), lifted 306/s                     --
+Latencies for 1000 iterations of "Ackerman(3, 4), liftedb":
+Ackerman(3, 4), liftedb:  0.86 WALL ( 1.79 usr +  0.04 sys =  1.83 CPU) @ 545.65/s (n=1000)
+                         Rate Ackerman(3, 4), liftedb
+Ackerman(3, 4), liftedb 546/s                      --
 
 ** Eio.Fiber.fork_promise 331/s
 Latencies for 1000 iterations of "Ackerman(3, 4), await":

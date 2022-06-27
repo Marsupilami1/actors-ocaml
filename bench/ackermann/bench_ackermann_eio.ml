@@ -2,13 +2,13 @@ open Eio
 
 let rec ackermann sw m n =
   Fiber.fork_promise ~sw (fun _ ->
-  match m, n with
-  | (0, _) -> n + 1
-  | (_, 0) -> Promise.await_exn @@ ackermann sw (m - 1) 1
-  | (_, _) ->
-    let vz = Promise.await_exn @@ ackermann sw m (n - 1) in
-    let result = ackermann sw (m - 1) vz in
-    Promise.await_exn result
+      match m, n with
+      | (0, _) -> n + 1
+      | (_, 0) -> Promise.await_exn @@ ackermann sw (m - 1) 1
+      | (_, _) ->
+        let vz = Promise.await_exn @@ ackermann sw m (n - 1) in
+        let result = ackermann sw (m - 1) vz in
+        Promise.await_exn result
     )
 
 let main _ =

@@ -178,7 +178,7 @@ module Method = struct
                   (private_name meth_field.name)] ()]
             ]
           else
-            Actorsocaml.Promise.await @@
+            Actorsocaml.Promise.get @@
             [%e apply_args meth_field.args
                 [%expr [%e self] #!
                     [%e ident_of_name

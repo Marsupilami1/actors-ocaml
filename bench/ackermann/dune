@@ -1,16 +1,19 @@
 (executable
  (libraries actorsocaml benchmark)
  (name bench_ackermann_await)
+ (preprocess (staged_pps actorsocamlppx))
  (modules bench_ackermann_await))
 
 (executable
  (libraries actorsocaml benchmark)
  (name bench_ackermann_forward)
+ (preprocess (staged_pps actorsocamlppx))
  (modules bench_ackermann_forward))
 
 (executable
  (libraries actorsocaml benchmark)
  (name bench_ackermann_lifted)
+ (preprocess (staged_pps actorsocamlppx))
  (modules bench_ackermann_lifted))
 
 (executable

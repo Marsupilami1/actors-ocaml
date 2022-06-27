@@ -137,30 +137,14 @@ module Method = struct
         Actorsocaml.Oactor.Actor [%e self_ident]
       in [%e e]]
 
-  let add_val_binding (val_fields : val_desc list) exp =
-    let add_one_binding exp (field : val_desc) =
-      let pattern = {
-        ppat_desc = Ppat_var field.name;
-        ppat_loc = exp.pexp_loc;
-        ppat_loc_stack = exp.pexp_loc_stack;
-        ppat_attributes = exp.pexp_attributes;
-      } in
-      let loc = exp.pexp_loc in
-      [%expr let [@warning "-26"] [%p pattern] = Domain.DLS.get
-                 [%e {exp with
-                      pexp_desc = Pexp_ident ({
-                          txt = Lident (dls_name field.name).txt;
-                          loc})}] in [%e exp]]
-    in List.fold_left add_one_binding exp val_fields
-
-  let make_private self_name val_fields meth_field = {
+  let make_private self_name _val_fields meth_field = {
     meth_field with
     name = private_name meth_field.name;
     flag = Public; (* TODO: solve the "implicitly public method" issue. *)
     expr =
       add_self_shadow self_name @@
       add_unit_arg @@
-      add_args meth_field.args (add_val_binding val_fields meth_field.expr);
+      add_args meth_field.args meth_field.expr;
   }
 
   let make_async_call self_name meth_field =
@@ -272,14 +256,18 @@ let add_DLS_to_val_fields ~loc (val_fields : val_desc list) =
 let add_val_definition (val_fields : val_desc list) exp =
   let add_one_definition exp (field : val_desc) =
     let pattern = {
-      ppat_desc = Ppat_var (dls_name field.name);
+      ppat_desc = Ppat_var field.name;
       ppat_loc = exp.pexp_loc;
       ppat_loc_stack = exp.pexp_loc_stack;
-      ppat_attributes = exp.pexp_attributes;
+      ppat_attributes = {
+        attr_name = mknoloc "resolve";
+        attr_payload = PStr [];
+        attr_loc = Location.none;
+      } :: exp.pexp_attributes;
     } in
     let loc = exp.pexp_loc in
     [%expr
-      let [%p pattern] = Domain.DLS.new_key (fun _ -> [%e field.expr]) in
+      let ([%p pattern]) = [%e field.expr] in
       [%e exp]
     ]
   in List.fold_left add_one_definition exp val_fields

@@ -99,3 +99,22 @@ let test_async () =
   let p = Promise.async (fun () -> 42) in
   Alcotest.(check int) "same int" 42 (Promise.await p);
   print_endline "Test 8 : Passed"
+
+let test _ =
+  let open Alcotest in
+  run "Actorsocaml tests" [
+    "Promise", [
+      test_case "fmap"        `Quick test_fmap;
+      test_case "bind"        `Quick test_bind;
+      test_case "applicative" `Quick test_applicative;
+      test_case "callback"    `Quick test_callback;
+      test_case "join"        `Quick test_join;
+      test_case "unify"       `Quick test_unify;
+      test_case "ring unify"  `Quick test_ring_unify;
+      test_case "huge unify"  `Quick test_huge_unify;
+      test_case "let"         `Quick test_let;
+      test_case "async"       `Quick test_async;
+    ];
+  ]
+
+let _ = Actor.Main.run test

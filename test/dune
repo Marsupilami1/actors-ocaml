@@ -1,9 +1,20 @@
 (test
  (libraries actorsocaml alcotest)
- (name test_actorsocaml)
- (modules test_actorsocaml
-          test_condition
-          test_actor test_promise))
+ (name test_actor)
+ (preprocess (staged_pps actorsocamlppx))
+ (modules test_actor))
+
+(test
+ (libraries actorsocaml alcotest)
+ (name test_condition)
+ (preprocess (staged_pps actorsocamlppx))
+ (modules test_condition))
+
+(test
+ (libraries actorsocaml alcotest)
+ (name test_promise)
+ (preprocess (staged_pps actorsocamlppx))
+ (modules test_promise))
 
 (test
  (libraries actorsocaml)

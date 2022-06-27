@@ -17,10 +17,10 @@ Your `dune` file may look like
 (executable
  (name myproject)
  (libraries actorsocaml)
- (preprocess (staged_ppx actorsocamlppx)))
+ (preprocess (staged_pps actorsocamlppx)))
 ```
 
-Be sure to use `staged_ppx` and not `ppx`. It's mandatory because of a call to the type checker.
+Be sure to use `staged_pps` and not `pps`. It's mandatory because of a call to the type checker.
 
 
 ## Write a program using actors

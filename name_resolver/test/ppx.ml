@@ -1,1 +1,4 @@
-let () = Ppxlib.Driver.standalone ()
+let () =
+  Printf.eprintf "Name resolver test\n%!";
+  Name_resolver.M.register();
+  Ppxlib.Driver.standalone ()

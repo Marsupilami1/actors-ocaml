@@ -42,10 +42,8 @@ let ident_of_name ~loc name = {
   pexp_loc_stack = [];
 }
 
-let dls_name val_field_name = {
-  val_field_name with
-  txt = Printf.sprintf "$actor_val_%s" val_field_name.txt
-}
+let dls_name val_field_name =
+  Printf.sprintf "$actor_val_%s" val_field_name
 
 let rec cat_maybes l =
   match l with
@@ -237,22 +235,6 @@ let split_fields fields =
   List.fold_right worker fields ([] , [])
 
 
-
-let add_DLS_to_val_fields ~loc (val_fields : val_desc list) =
-  let wrap_one_val (field : val_desc) = {
-    pcf_desc =
-      Pcf_val (dls_name field.name , Immutable,
-               Cfk_concrete(
-                 Fresh, [%expr
-                   Domain.DLS.new_key (
-                     fun _ -> [%e field.expr])
-                 ]));
-    pcf_loc = loc;
-    pcf_attributes = []
-  }
-  in List.map wrap_one_val val_fields
-
-
 let add_val_definition (val_fields : val_desc list) exp =
   let add_one_definition exp (field : val_desc) =
     let pattern = {
@@ -317,21 +299,6 @@ let scheduler_fields =
       (Cfk_concrete(Fresh, [%expr snd [%e val_field_ident]]));
   ]
 
-(* let transform = *)
-(*   object (self) *)
-(*     inherit Ast_traverse.map as super *)
-
-(*     method! expression expr = *)
-(*       let prev_default_loc = !default_loc in *)
-(*       default_loc := expr.pexp_loc; *)
-(*       (\* let { pexp_attributes; _ } = expr in *\) *)
-(*       let new_expr = *)
-(*       in *)
-(*       default_loc := prev_default_loc; *)
-(*       new_expr *)
-(*   end *)
-
-
 let expr_Actor (mapper : mapper) expr = match expr with
   (* object%actor ... end *)
   | [%expr [%actor [%e? {pexp_desc = Pexp_object class_struct; _} as e]]] ->
@@ -388,30 +355,24 @@ let expr_Actor (mapper : mapper) expr = match expr with
                   Method.meth_forward_name @@ make_str @@ exp_to_string meth)
     } in
     [%expr [%e application]]
-  (* val_field <- v; ... *)
-  | [%expr [%e? {pexp_desc = Pexp_setinstvar(lbl, value); _} as e]; [%e? next]] ->
-    let loc = e.pexp_loc in
-    let dls_ident = {
-      pexp_desc = Pexp_ident {txt = Lident (dls_name lbl).txt; loc};
-      pexp_loc = loc; pexp_attributes = []; pexp_loc_stack = [];
-    } in
-    let ident = {
-      ppat_desc = Ppat_var lbl;
-      ppat_loc = loc; ppat_attributes = []; ppat_loc_stack = [];
-    } in
-    [%expr
-      Domain.DLS.set [%e dls_ident] [%e value];
-      let [@warning "-26"] [%p ident][@resolve] = Domain.DLS.get [%e dls_ident] in
-      [%e next]
-    ]
   (* val_field <- v *)
+  (* transform this into [(ignore val_field)[@set v]] *)
+  (* We need the ignore y to resolve the name. *)
   | {pexp_desc = Pexp_setinstvar(lbl, value); _} as e ->
-    let loc = e.pexp_loc in
-    let dls_ident = {
-      pexp_desc = Pexp_ident {txt = Lident (dls_name lbl).txt; loc};
-      pexp_loc = loc; pexp_attributes = []; pexp_loc_stack = [];
-    } in
-    [%expr Domain.DLS.set [%e dls_ident] [%e value]]
+    let loc = Location.none in
+    { e with
+      pexp_desc = [%expr
+        ignore [%e ident_of_name ~loc lbl.txt]
+      ].pexp_desc;
+      pexp_attributes = {
+        attr_name = mknoloc "set";
+        attr_loc = Location.none;
+        attr_payload = PStr [{
+            pstr_desc = Pstr_eval (value, []);
+            pstr_loc = Location.none
+          }]
+      } :: e.pexp_attributes;
+    }
   | e -> default_mapper.expr mapper e
 
 
@@ -422,25 +383,47 @@ let expr_DLS_adder (mapper : mapper) expr =
     let new_name_opt = resolved_name l in
     if new_name_opt = None then default_mapper.expr mapper expr
     else (
-      let new_name = Printf.sprintf "$actor_var_%s" @@ Option.get new_name_opt in
+      let new_name = dls_name @@ Option.get new_name_opt in
       [%expr Domain.DLS.get [%e {expr with
-       pexp_desc = Pexp_ident(mkloc (Longident.Lident new_name) loc);
-       pexp_attributes = [];
-      }]]
+                                 pexp_desc = Pexp_ident(mkloc (Longident.Lident new_name) loc);
+                                 pexp_attributes = [];
+                                }]]
     )
   | [%expr let [%p? { ppat_desc = Ppat_var s;
-      ppat_attributes = l; _
-    } as p] = [%e? v] in [%e? e]
+                      ppat_attributes = l; _
+                    } as p] = [%e? v] in [%e? e]
   ] ->
     let new_name_opt = defined_name l in
     if new_name_opt = None then default_mapper.expr mapper expr
     else (
-      let new_name = Printf.sprintf "$actor_var_%s" @@ Option.get new_name_opt in
+      let new_name = dls_name @@ Option.get new_name_opt in
       let loc = expr.pexp_loc in
       [%expr let [%p { p with
-        ppat_desc = Ppat_var({txt = new_name; loc = s.loc});
-        ppat_attributes = [];
-      }] = Domain.DLS.new_key (fun _ -> [%e v]) in [%e mapper.expr mapper e]]
+                       ppat_desc = Ppat_var({txt = new_name; loc = s.loc});
+                       ppat_attributes = [];
+                     }] = Domain.DLS.new_key (fun _ -> [%e v]) in [%e mapper.expr mapper e]]
+    )
+  (* (ignore val_field[@resolved "new_name"])[@set v] *)
+  (* transform this into DLS.set new_name v *)
+  | {pexp_desc =
+       Pexp_apply({
+           pexp_desc = Pexp_ident
+               {txt = Longident.Lident "ignore"; _} ; _},
+           [Nolabel, ({pexp_attributes = l; _})]
+         );
+     pexp_attributes = {
+       attr_name = {txt = "set"; _};
+       attr_payload = PStr [
+           {pstr_desc = Pstr_eval (value, []);
+            _}
+         ]; _} :: _;
+     _ } ->
+    let new_name_opt = resolved_name l in
+    if new_name_opt = None then default_mapper.expr mapper expr
+    else (
+      let new_name = Option.get new_name_opt in
+      let loc = expr.pexp_loc in
+      [%expr Domain.DLS.set [%e ident_of_name ~loc (dls_name new_name)] [%e value]]
     )
   | e -> default_mapper.expr mapper e
 
@@ -462,4 +445,5 @@ let () =
         |> actor_mapper.structure actor_mapper
         |> Name_resolver.M.impl
         |> dls_adder.structure dls_adder
+        (* |> (fun s -> Pprintast.structure Format.std_formatter s; s) *)
       )

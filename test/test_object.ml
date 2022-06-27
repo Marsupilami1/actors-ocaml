@@ -1,16 +1,5 @@
 open Actorsocaml
 
-let a = object%actor
-  val y = 42
-  method get = y
-end
-
-let b = object%actor
-  val z = 67
-  method foo = z
-  method get = a#!!get
-end
-
 (* let foo : <foo : int; ..> = object (this) *)
 (*   method private field = 0 *)
 (*   method foo = *)
@@ -20,6 +9,16 @@ end
 
 
 let main () =
+let a = object%actor
+  val y = 0
+  method get = y
+  method set n = y <- n
+end in
+
+let b = object%actor
+  method get = a#!!get
+end in
+  a#.set 42;
   let p = b#!get in
   Printf.printf "a.y = %d\n"  @@ Promise.get p
 (* Printf.printf "foo = %d\n"  @@ foo#field *)

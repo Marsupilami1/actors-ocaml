@@ -7,6 +7,7 @@
 (executable
  (libraries actorsocaml)
  (name exple_ring)
+ (preprocess (staged_pps actorsocamlppx))
  (modules exple_ring))
 
 (executable

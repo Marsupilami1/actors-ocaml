@@ -62,20 +62,22 @@ let domains : domain_info Array.t =
         let mutex, condition = info.trigger in
         Mutex.lock mutex;
         let p_count = Atomic.get info.p_count in
-        if p_count = 0 then
+        if p_count = 0 then (
           Condition.wait condition mutex;
+        );
         (* info.p_count is not 0 *)
         Atomic.decr info.p_count;
         (* find the next process to execute *)
         let res = ref None in
         let current_actor_info = ref @@ Queue.peek info.fifos in
         while !res = None do
-          current_actor_info := Queue.peek info.fifos;
           if !current_actor_info.current <> None then begin
             res := !current_actor_info.current;
             !current_actor_info.current <- None
-          end else
+          end else begin
             res := Chan.recv_poll @@ (Queue.rotate info.fifos).fifo;
+            current_actor_info := Queue.peek info.fifos;
+          end
         done;
         Mutex.unlock mutex;
         Option.get !res, !current_actor_info
@@ -118,7 +120,9 @@ let domains : domain_info Array.t =
                       (Process((Obj.magic fill), (fun _ -> continue k (Promise.get p))));
                   Mutex.lock @@ fst info.trigger;
                   Atomic.incr @@ info.p_count;
-                  Mutex.unlock @@ fst info.trigger
+                  Mutex.unlock @@ fst info.trigger;
+                  Condition.broadcast @@ snd info.trigger;
+                  loop ()
               )
             | Forward f -> Some (
                 fun (k : (a, _) continuation) ->

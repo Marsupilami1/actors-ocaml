@@ -1,11 +1,12 @@
 open Actorsocaml
 
 let test _ =
-  let actor = object%actor
+  let actor = object%actor (_self)
     val mutable x = 0
     method set n = x <- n
+    method get = x
     method wait =
-      Multiroundrobin.wait_for (fun _ -> x = 42);
+      Multiroundrobin.wait_for (fun _ -> _self#.get = 42);
       Alcotest.(check int) "same int" 42 x
   end in
 

@@ -84,16 +84,9 @@ module Method = struct
                               pexp_attributes = []; pexp_loc_stack =[]
                             }));
 
-    (* Exp.poly meth_field.expr None)); *)
     pcf_loc = loc;
     pcf_attributes = [];
   }
-
-  let add_unit_arg e =
-    let loc = e.pexp_loc in
-    [%expr fun () ->
-      [%e e]
-    ]
 
   let add_args args_list exp =
     let loc = exp.pexp_loc in
@@ -140,9 +133,9 @@ module Method = struct
     name = private_name meth_field.name;
     flag = Public; (* TODO: solve the "implicitly public method" issue. *)
     expr =
+      add_args meth_field.args @@
       add_self_shadow self_name @@
-      add_unit_arg @@
-      add_args meth_field.args meth_field.expr;
+      meth_field.expr;
   }
 
   let make_async_call self_name meth_field =
@@ -156,7 +149,7 @@ module Method = struct
                  [%e apply_args meth_field.args @@
                    [%expr [%e mk_send ~loc:loc
                        ([%expr Actorsocaml.Actor.methods [%e self]])
-                       (private_name meth_field.name)] ()]])));
+                       (private_name meth_field.name)]]])));
           p]
     }
 
@@ -175,7 +168,7 @@ module Method = struct
             [%e apply_args meth_field.args @@
               [%expr [%e mk_send ~loc:loc
                   ([%expr Actorsocaml.Actor.methods [%e self]])
-                  (private_name meth_field.name)] ()]
+                  (private_name meth_field.name)]]
             ]
           else
             Actorsocaml.Promise.get @@
@@ -202,7 +195,7 @@ module Method = struct
             [%e apply_args meth_field.args @@
               [%expr [%e mk_send ~loc:loc
                   ([%expr Actorsocaml.Actor.methods [%e self]])
-                  (private_name meth_field.name)] ()]
+                  (private_name meth_field.name)]]
             ]
           else
             Actorsocaml.Promise.await @@
@@ -230,7 +223,7 @@ module Method = struct
                      [%e apply_args meth_field.args @@
                        [%expr [%e mk_send ~loc:loc
                            ([%expr Actorsocaml.Actor.methods [%e self]])
-                           (private_name meth_field.name)] ()]]))));
+                           (private_name meth_field.name)]]]))));
         ]
     }
 
@@ -417,6 +410,55 @@ let expr_Actor (mapper : mapper) expr = match expr with
   | e -> default_mapper.expr mapper e
 
 
+(* It is called for expressions inside closures, after the name resolver *)
+(* Its goal is to find resolved names (and so internal mutable state) in the expression, *)
+(* it raises an error if a resolved name is found. *)
+let expr_resolve_hunter (mapper : mapper) expr =
+  match expr with
+  (* x[@resolved "x_270"] *)
+  | {pexp_desc = Pexp_ident(_); pexp_attributes = l; _} ->
+    let new_name_opt = resolved_name l in
+    if new_name_opt = None then default_mapper.expr mapper expr
+    else (
+      Printf.eprintf "Closures cannot capture internal mutable state, you may want to use something like:\n```\nlet a = x in fun _ -> ... a ...\n```\ninstead of:\n```\nfun _ -> ... x ...\n```";
+      failwith "Fatal error"
+    )
+  | e -> default_mapper.expr mapper e
+
+let resolve_hunter = {
+  default_mapper with
+  expr = expr_resolve_hunter;
+}
+
+(* Find closures and call resolve hunter on their bodys *)
+let expr_closure_hunter (mapper : mapper) expr =
+  match expr with
+  | [%expr fun [%p? _] -> [%e? body]] ->
+    ignore @@ resolve_hunter.expr resolve_hunter body;
+    default_mapper.expr mapper expr
+  | {pexp_desc = Pexp_function(cs); _} ->
+    List.iter
+      (fun c ->
+         ignore @@ resolve_hunter.expr resolve_hunter c.pc_rhs;
+         ignore @@ Option.map (resolve_hunter.expr resolve_hunter) c.pc_guard
+      ) cs;
+    default_mapper.expr mapper expr
+  | _ -> default_mapper.expr mapper expr
+
+let closure_hunter = {
+  default_mapper with
+  expr = expr_closure_hunter;
+}
+
+let class_field_DLS_adder (mapper : mapper) cf =
+  match cf.pcf_desc with
+  | Pcf_method (_, _, Cfk_concrete(_, {pexp_desc = Pexp_poly(e, None); _})) -> let _args, body = Method.destruct e in
+    ignore @@ closure_hunter.expr closure_hunter body;
+    default_mapper.class_field mapper cf
+
+  | _ -> default_mapper.class_field mapper cf
+
+
 let expr_DLS_adder (mapper : mapper) expr =
   match expr with
   (* x[@resolved "x_270"] *)
@@ -476,6 +518,7 @@ let actor_mapper = {
 let dls_adder = {
   default_mapper with
   expr = expr_DLS_adder;
+  class_field = class_field_DLS_adder;
 }
 
 let () =

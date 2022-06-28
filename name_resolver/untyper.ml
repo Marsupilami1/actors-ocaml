@@ -19,7 +19,7 @@ module Make (M : S) = struct
     Compile_common.with_info
       ~native:false
       ~tool_name:M.name
-      ~output_prefix:""
+      ~output_prefix:"foo"
       ~dump_ext:".dump"
       ~source_file
       f

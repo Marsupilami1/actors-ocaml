@@ -10,3 +10,6 @@ let methods (Actor actor) = actor
 
 let in_same_domain (Actor actor) =
   actor#domain = Domain.self ()
+
+let forward p =
+  Effect.perform @@ Multiroundrobin.Forward (fun fill -> Promise.add_callback p fill)

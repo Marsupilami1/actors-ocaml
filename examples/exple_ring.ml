@@ -8,13 +8,13 @@ let rec ring_member id = object%actor
   method create_ring id size leader =
     if id <= size then begin
       next <- Option.some @@ ring_member id;
-      (Option.get next)#.create_ring (id + 1) size leader
+      (Option.get next)#?create_ring (id + 1) size leader
     end else
       next <- Option.some leader
 
   method send hops =
     if hops > 0 then
-      (Option.get next)#.send (hops-1)
+      (Option.get next)#?send (hops-1)
     else begin
       Printf.printf "%d\n%!" id
     end

@@ -10,3 +10,6 @@ val methods : 'a t -> 'a
 
 (** [in_same_domain actor] tells if you're running in [actor]'s domain. *)
 val in_same_domain : 'a t -> bool
+
+(** [forward p] will fill the current promise with the result of [p]. *)
+val forward : 'a Promise.t -> 'a

@@ -132,7 +132,7 @@ module Method = struct
     let self_ident = ident_of_name ~loc:Location.none self_name in
     [%expr
       let [%p self_pattern] =
-        Actorsocaml.Oactor.Actor [%e self_ident]
+        Actorsocaml.Actor.Actor [%e self_ident]
       in [%e e]]
 
   let make_private self_name _val_fields meth_field = {
@@ -151,11 +151,11 @@ module Method = struct
       meth_field with
       expr = add_self_shadow self_name @@ add_args_var meth_field.args [%expr
           let p, fill = Actorsocaml.Promise.create () in
-          Actorsocaml.Oactor.send [%e self]
+          Actorsocaml.Actor.send [%e self]
             (Actorsocaml.Multiroundrobin.Process(fill, (fun _ ->
                  [%e apply_args meth_field.args @@
                    [%expr [%e mk_send ~loc:loc
-                       ([%expr Actorsocaml.Oactor.methods [%e self]])
+                       ([%expr Actorsocaml.Actor.methods [%e self]])
                        (private_name meth_field.name)] ()]])));
           p]
     }
@@ -171,10 +171,10 @@ module Method = struct
     { meth_field with
       name = meth_sync_name meth_field.name;
       expr = add_self_shadow self_name @@ add_args_var meth_field.args [%expr
-          if Actorsocaml.Oactor.in_same_domain [%e self] then
+          if Actorsocaml.Actor.in_same_domain [%e self] then
             [%e apply_args meth_field.args @@
               [%expr [%e mk_send ~loc:loc
-                  ([%expr Actorsocaml.Oactor.methods [%e self]])
+                  ([%expr Actorsocaml.Actor.methods [%e self]])
                   (private_name meth_field.name)] ()]
             ]
           else
@@ -198,10 +198,10 @@ module Method = struct
     { meth_field with
       name = meth_coop_name meth_field.name;
       expr = add_self_shadow self_name @@ add_args_var meth_field.args [%expr
-          if Actorsocaml.Oactor.in_same_domain [%e self] then
+          if Actorsocaml.Actor.in_same_domain [%e self] then
             [%e apply_args meth_field.args @@
               [%expr [%e mk_send ~loc:loc
-                  ([%expr Actorsocaml.Oactor.methods [%e self]])
+                  ([%expr Actorsocaml.Actor.methods [%e self]])
                   (private_name meth_field.name)] ()]
             ]
           else
@@ -225,11 +225,11 @@ module Method = struct
       name = meth_forward_name meth_field.name;
       expr = add_self_shadow self_name @@ add_args_var meth_field.args [%expr
           Effect.perform @@ Actorsocaml.Multiroundrobin.Forward
-            (fun forward -> Actorsocaml.Oactor.send [%e self]
+            (fun forward -> Actorsocaml.Actor.send [%e self]
                 (Actorsocaml.Multiroundrobin.Process(forward, (fun _ ->
                      [%e apply_args meth_field.args @@
                        [%expr [%e mk_send ~loc:loc
-                           ([%expr Actorsocaml.Oactor.methods [%e self]])
+                           ([%expr Actorsocaml.Actor.methods [%e self]])
                            (private_name meth_field.name)] ()]]))));
         ]
     }
@@ -345,7 +345,7 @@ let expr_Actor (mapper : mapper) expr = match expr with
       (List.map (Method.field_of_desc ~loc:loc) @@ Method.lambda_lift self_name val_fields meth_fields)
     in
     [%expr
-      Actorsocaml.Oactor.Actor [%e
+      Actorsocaml.Actor.Actor [%e
         mapper.expr mapper @@
         add_val_definition val_fields @@ {
           e with pexp_desc = Pexp_object {
@@ -359,7 +359,7 @@ let expr_Actor (mapper : mapper) expr = match expr with
     let application = {
       expr with
       pexp_desc =
-        Pexp_send([%expr Actorsocaml.Oactor.methods [%e obj]],
+        Pexp_send([%expr Actorsocaml.Actor.methods [%e obj]],
                   make_str @@ exp_to_string meth)
     } in
     [%expr [%e application]]
@@ -369,7 +369,7 @@ let expr_Actor (mapper : mapper) expr = match expr with
     let application = {
       expr with
       pexp_desc =
-        Pexp_send([%expr Actorsocaml.Oactor.methods [%e obj]],
+        Pexp_send([%expr Actorsocaml.Actor.methods [%e obj]],
                   Method.meth_coop_name @@ make_str @@ exp_to_string meth)
     } in
     [%expr [%e application]]
@@ -379,7 +379,7 @@ let expr_Actor (mapper : mapper) expr = match expr with
     let application = {
       expr with
       pexp_desc =
-        Pexp_send([%expr Actorsocaml.Oactor.methods [%e obj]],
+        Pexp_send([%expr Actorsocaml.Actor.methods [%e obj]],
                   Method.meth_sync_name @@ make_str @@ exp_to_string meth)
     } in
     [%expr [%e application]]
@@ -389,7 +389,7 @@ let expr_Actor (mapper : mapper) expr = match expr with
     let application = {
       expr with
       pexp_desc =
-        Pexp_send([%expr Actorsocaml.Oactor.methods [%e obj]],
+        Pexp_send([%expr Actorsocaml.Actor.methods [%e obj]],
                   Method.meth_forward_name @@ make_str @@ exp_to_string meth)
     } in
     [%expr [%e application]]

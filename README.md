@@ -36,8 +36,8 @@ let fib = object%actor (self)
   method fib n =
     if n < 2 then n
     else begin
-      let f1 = Promise.await @@ self#fib (n - 1) in
-      let f2 = Promise.await @@ self#fib (n - 2) in
+      let f1 = Promise.await @@ self#!fib (n - 1) in
+      let f2 = Promise.await @@ self#!fib (n - 2) in
       f1 + f2
     end
 end
@@ -127,7 +127,8 @@ The methods of the generated actor returns promises, you can call the method `ge
 
 ``` ocaml
 actor#!get (* Async call, returns an int Promise.t *)
-actor#.get (* Sync call, returns an int *)
+actor#?get (* Sync call, returns an int, may cooperate *)
+actor#.get (* Sync call, returns an int, does not cooperate *)
 actor#!!get (* Forward call, see the forward section *)
 ```
 

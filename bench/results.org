@@ -57,17 +57,43 @@ fact basic eio:  1.22 WALL ( 1.21 usr +  0.00 sys =  1.21 CPU) @ 8231.37/s (n=10
                  Rate fact basic eio
 fact basic eio 8231/s             --
 
-* Linked list
+* Linked list (Be careful, results are in iter/s _OR_ s/iter)
 System time is significant here.
 Can not allocate more than 127 Domains (so max 128 with the main domain).
-** 10_000 nodes, Basic
+** Basic
+*** 1000 nodes
 Latencies for 100 iterations of "Linked list":
-Linked list: 18.35 WALL (18.35 usr +  0.36 sys = 18.71 CPU) @  5.34/s (n=100)
+Linked list:  1.61 WALL ( 3.72 usr +  0.82 sys =  4.54 CPU) @ 22.04/s (n=100)
               Rate Linked list
-Linked list 5.34/s          --
+Linked list 22.0/s          --
 
-** 10_000 nodes, Tail recursive
-Latencies for 1000 iterations of "Linked list":
-Linked list:  2.62 WALL ( 5.15 usr +  0.28 sys =  5.43 CPU) @ 184.06/s (n=1000)
-             Rate Linked list
-Linked list 184/s          --
+*** 10_000 nodes
+Latencies for 10 iterations of "Linked list":
+Linked list:  5.46 WALL (20.04 usr +  1.28 sys = 21.32 CPU) @  0.47/s (n=10)
+            s/iter Linked list
+Linked list   2.13          --
+
+** Tail recursive
+*** 1000 nodes
+Latencies for 100 iterations of "Linked list":
+Linked list:  1.66 WALL ( 3.63 usr +  0.96 sys =  4.59 CPU) @ 21.79/s (n=100)
+              Rate Linked list
+Linked list 21.8/s          --
+
+*** 1000 nodes forward
+Latencies for 100 iterations of "Linked list":
+Linked list:  1.06 WALL ( 2.21 usr +  0.64 sys =  2.85 CPU) @ 35.11/s (n=100)
+              Rate Linked list
+Linked list 35.1/s          --
+
+*** 10_000 nodes
+Latencies for 10 iterations of "Linked list":
+Linked list:  5.46 WALL (19.52 usr +  1.22 sys = 20.75 CPU) @  0.48/s (n=10)
+            s/iter Linked list
+Linked list   2.07          --
+
+*** 10_000 nodes forward
+Latencies for 10 iterations of "Linked list":
+Linked list:  4.01 WALL (14.12 usr +  0.65 sys = 14.77 CPU) @  0.68/s (n=10)
+            s/iter Linked list
+Linked list   1.48          --

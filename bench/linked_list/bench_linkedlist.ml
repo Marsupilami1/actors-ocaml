@@ -1,55 +1,34 @@
 open Actorsocaml
 
-module MyMessage = struct
-  type 'a t =
-    | Sum : int t
-    | SumTerm : int -> int t
-  type method_type = { m : 'a . ('a Promise.t -> 'a) -> 'a t -> 'a }
+let cell n next = object%actor
+  val state = n
+  val next = next
+
+  method sum =
+    match next with
+    | None -> 0
+    | Some actor ->
+      state + actor#?sum
+
+  method sum_term acc =
+    match next with
+    | None -> acc
+    | Some actor ->
+      actor#?sum_term (acc + state)
 end
-
-module MyActor = Actor.Make(Multiroundrobin)(MyMessage)
-
-type memory = {
-  mutable state : int; mutable next : MyActor.t option
-}
-
-let actor_methods s next =
-  let init : unit -> memory
-    = fun _ -> {state = s; next = next} in
-  let mem = Domain.DLS.new_key init in
-  let methods
-  : type a . MyActor.t
-    -> (a Promise.t -> a)
-    -> a MyMessage.t
-    -> a
-  = fun _ forward -> function
-  | Sum -> begin
-    let m = Domain.DLS.get mem in
-    match m.next with
-    | None -> m.state
-    | Some n ->
-      m.state + (Promise.await @@ MyActor.send n Sum)
-    end
-  | SumTerm acc -> begin
-    let m = Domain.DLS.get mem in
-    match m.next with
-    | None -> acc + m.state
-    | Some n ->
-      forward @@ (MyActor.send n @@ SumTerm(acc + m.state))
-    end
-in fun self -> {MyMessage.m = fun forward -> methods self forward}
 
 let rec generate n =
   if n = 0 then
-    MyActor.create (actor_methods n None)
+    cell 0 None
   else
-    MyActor.create (actor_methods n (Some (generate (n - 1))))
+    cell n @@ Some (generate (n - 1))
 
 let main _ =
   let n = 10000 in
-  let r = 100 in
+  let r = 25 in
   let nodes = generate n in
-  let f () = Promise.await @@ MyActor.send nodes Sum in
+  print_endline "done.";
+  let f () = nodes#.sum_term 0 in
   let samples = Benchmark.latency1 ~name: "Linked list" (Int64.of_int r) f () in
   Benchmark.tabulate samples
 

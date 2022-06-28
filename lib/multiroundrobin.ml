@@ -20,8 +20,7 @@ module Queue = struct
   (** [rotate q] returns the first value in [q] and push it back to [q]. *)
   let rotate q =
     let v = Queue.take q in
-    Queue.push v q;
-    v
+    Queue.push v q
 end
 
 type actor_info = {fifo : process_queue; mutable current : process Option.t}
@@ -61,26 +60,33 @@ let domains : domain_info Array.t =
       let get_next_process () =
         let mutex, condition = info.trigger in
         Mutex.lock mutex;
+
+        (* block until a process is available *)
         let p_count = Atomic.get info.p_count in
-        if p_count = 0 then (
-          Condition.wait condition mutex;
-        );
-        (* info.p_count is not 0 *)
+        if p_count = 0 then Condition.wait condition mutex;
         Atomic.decr info.p_count;
+
+        (* info.p_count is not 0 *)
         (* find the next process to execute *)
-        let res = ref None in
-        let current_actor_info = ref @@ Queue.peek info.fifos in
-        while !res = None do
-          if !current_actor_info.current <> None then begin
-            res := !current_actor_info.current;
-            !current_actor_info.current <- None
-          end else begin
-            res := Chan.recv_poll @@ (Queue.rotate info.fifos).fifo;
-            current_actor_info := Queue.peek info.fifos;
+        let rec find_process () =
+          let current_actor_info = Queue.peek info.fifos in
+          (* current process, stopped by get *)
+          if current_actor_info.current <> None then begin
+            let res = Option.get current_actor_info.current in
+            current_actor_info.current <- None;
+            (res, current_actor_info)
           end
-        done;
+          (* next process in the queue *)
+          else begin
+            match Chan.recv_poll @@ current_actor_info.fifo with
+            | None -> Queue.rotate info.fifos; find_process ()
+            | Some res -> (res, current_actor_info)
+          end
+        in
+        let res = find_process () in
+        Queue.rotate info.fifos;
         Mutex.unlock mutex;
-        Option.get !res, !current_actor_info
+        res
       in
 
       let push_process queue process =

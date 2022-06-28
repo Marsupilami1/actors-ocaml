@@ -186,6 +186,33 @@ module Method = struct
         ]
     }
 
+  let meth_coop_name name = {
+    name with
+    txt = name.txt ^ "_coop"
+  }
+
+  (* same as sync call, but await instead of get (faster) *)
+  let make_coop_call self_name meth_field =
+    let loc = meth_field.name.loc in
+    let self = ident_of_name ~loc:loc self_name in
+    { meth_field with
+      name = meth_coop_name meth_field.name;
+      expr = add_self_shadow self_name @@ add_args_var meth_field.args [%expr
+          if Actorsocaml.Oactor.in_same_domain [%e self] then
+            [%e apply_args meth_field.args @@
+              [%expr [%e mk_send ~loc:loc
+                  ([%expr Actorsocaml.Oactor.methods [%e self]])
+                  (private_name meth_field.name)] ()]
+            ]
+          else
+            Actorsocaml.Promise.await @@
+            [%e apply_args meth_field.args
+                [%expr [%e self] #!
+                    [%e ident_of_name
+                        ~loc:meth_field.name.loc meth_field.name.txt]]]
+        ]
+    }
+
   let meth_forward_name name = {
     name with
     txt = name.txt ^ "_forward"
@@ -213,6 +240,7 @@ module Method = struct
            make_private      self_name val_fields field;
            make_async_call   self_name field;
            make_sync_call    self_name field;
+           make_coop_call self_name field;
            make_forward_call self_name field;
          ])
       meth_fields
@@ -333,6 +361,16 @@ let expr_Actor (mapper : mapper) expr = match expr with
       pexp_desc =
         Pexp_send([%expr Actorsocaml.Oactor.methods [%e obj]],
                   make_str @@ exp_to_string meth)
+    } in
+    [%expr [%e application]]
+  (* object#.method *)
+  | [%expr [%e? obj] #? [%e? meth]] as expr ->
+    let loc = expr.pexp_loc in
+    let application = {
+      expr with
+      pexp_desc =
+        Pexp_send([%expr Actorsocaml.Oactor.methods [%e obj]],
+                  Method.meth_coop_name @@ make_str @@ exp_to_string meth)
     } in
     [%expr [%e application]]
   (* object#.method *)

@@ -1,4 +1,5 @@
 (executable
  (libraries actorsocaml benchmark)
  (name bench_linkedlist)
+ (preprocess (staged_pps actorsocamlppx))
  (modules bench_linkedlist))

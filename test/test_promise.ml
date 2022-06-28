@@ -37,55 +37,6 @@ let test_join () =
   Alcotest.(check int) "same int" 42 (Promise.await k);
   print_endline "Test 5 : Passed"
 
-let test_unify () =
-  let (p, fillp) = Promise.create () in
-  let (q, _) = Promise.create () in
-  Promise.add_callback q (fun v ->
-      Alcotest.(check int) "same int" 42 v);
-  Promise.unify q p;
-  fillp 42;
-  Alcotest.(check int) "same int" 42 (Promise.await p);
-  Alcotest.(check int) "same int" 42 (Promise.await q);
-  print_endline "Test 6 : Passed"
-
-let test_ring_unify () =
-  let p, fillp = Promise.create () in
-  let q, _ = Promise.create () in
-  Promise.unify p q;
-  Promise.unify q p;
-  fillp 42;
-  Alcotest.(check int) "same int" 42 @@ Promise.await q;
-  Alcotest.(check int) "same int" 42 @@ Promise.await p
-
-(*  for n = 8: *)
-(* O <- filled *)
-(* +----O      *)
-(* O    +-O    *)
-(* +-O  O |    *)
-(* O |  | O    *)
-(* | O  O-+    *)
-(* O-+    O    *)
-(*   O----+    *)
-(*        O    *)
-let test_huge_unify () =
-  let n = 128 in
-  let t = Array.init n (fun _ -> Promise.create ()) in
-  let t' = Array.init n (fun _ -> Promise.create ()) in
-  for i=1 to (n/2 - 1) do
-    Promise.unify (fst t.(i)) (fst (t.(2 * i)));
-    Promise.unify (fst t.(i)) (fst (t.(2 * i + 1)));
-    Promise.unify (fst t'.(i)) (fst (t'.(2 * i)));
-    Promise.unify (fst t'.(i)) (fst (t'.(2 * i + 1)));
-  done;
-  for i=(n/2) to (n-1) do
-    Promise.unify (fst t.(i)) (fst (t'.(i)));
-  done;
-  (snd t.(1)) 42;
-  for i=1 to (n-1) do
-    Alcotest.(check int) "same int" 42 @@ Promise.await (fst t.(i));
-    Alcotest.(check int) "same int" 42 @@ Promise.await (fst t'.(i));
-  done
-
 let test_let () =
   let p = begin
     let* x = Promise.pure 40
@@ -109,9 +60,6 @@ let test _ =
       test_case "applicative" `Quick test_applicative;
       test_case "callback"    `Quick test_callback;
       test_case "join"        `Quick test_join;
-      test_case "unify"       `Quick test_unify;
-      test_case "ring unify"  `Quick test_ring_unify;
-      test_case "huge unify"  `Quick test_huge_unify;
       test_case "let"         `Quick test_let;
       test_case "async"       `Quick test_async;
     ];

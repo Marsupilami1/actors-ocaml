@@ -59,10 +59,6 @@ val add_callback : 'a t -> ('a -> unit) -> unit
 
 (** {1 Useful functions} *)
 
-(** [unify p p'] unifies two promises. They now share
-    their callbacks and will be fulfilled at the same time. *)
-val unify : 'a t -> 'a t -> unit
-
 (** [fmap f p] is the classic [fmap] function, it maps the
     function [f] into the promise [p]. *)
 val fmap : ('a -> 'b) -> 'a t -> 'b t

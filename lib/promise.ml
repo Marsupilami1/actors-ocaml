@@ -8,20 +8,9 @@ type 'a status =
   (* An empty promise accumulates callbacks to be executed when it is filled *)
   | Empty of ('a -> unit) list
   | Filled of 'a
-  | Forwarded of 'a t Atomic.t
 and 'a t = 'a status Atomic.t
 
 type 'a resolver = 'a -> unit
-
-let rec find_leader p =
-  let x = Atomic.get p in
-  match Atomic.get x with
-  | Forwarded p' ->
-    let leader = find_leader p' in
-    if Atomic.compare_and_set p x (leader)
-    then leader
-    else find_leader p
-  | _ -> x
 
 let apply_callbacks l v =
   List.iter (fun f -> f v) l
@@ -35,7 +24,6 @@ let rec fill p v =
       apply_callbacks l v
     else fill p v;
   | Filled _ -> raise Promise__Multiple_Write
-  | Forwarded p' -> fill (find_leader p') v
 
 let create () =
   let p = Atomic.make @@ Empty [] in
@@ -45,23 +33,20 @@ type _ Effect.t += NotReady : 'a t -> 'a Effect.t
 type _ Effect.t += Get : 'a t -> 'a Effect.t
 
 
-let rec await p =
+let await p =
   match Atomic.get p with
   | Empty _ -> perform @@ NotReady p
   | Filled v -> v
-  | Forwarded p' -> await (find_leader p')
 
-let rec get p =
+let get p =
   match Atomic.get p with
   | Empty _ -> perform @@ Get p
   | Filled v -> v
-  | Forwarded p' -> get (find_leader p')
 
-let rec is_ready p =
+let is_ready p =
   match Atomic.get p with
   | Empty _ -> false
   | Filled _ -> true
-  | Forwarded p' -> is_ready (find_leader p')
 
 (* Add a callback to the given promise *)
 (* If it's already filled, just run the callback *)
@@ -75,29 +60,6 @@ let rec add_callback p f =
       ()
     else add_callback p f
   | Filled v -> f v
-  | Forwarded p' -> add_callback (find_leader p') f
-
-let rec unify_leaders p p' =
-  if p == p' then print_endline "beng" else begin
-    match Atomic.get p, Atomic.get p' with
-    | Filled v, (Empty l as x) ->
-      if Atomic.compare_and_set p' x (Forwarded(Atomic.make p)) then
-        apply_callbacks l v
-      else unify_leaders p p'
-    | Filled _, Filled _ -> raise Promise__Multiple_Write
-    | Filled _, Forwarded q -> unify_leaders p (Atomic.get q)
-    | _, Filled _ -> unify_leaders p' p
-    | (Empty l as x), Empty _ ->
-      if Atomic.compare_and_set p x (Forwarded (Atomic.make p')) then
-        add_callback p' (apply_callbacks l)
-      else unify_leaders p p'
-    | Forwarded q, Forwarded q' -> unify_leaders (Atomic.get q) (Atomic.get q')
-    | Empty _, Forwarded q -> unify_leaders p (Atomic.get q)
-    | Forwarded _, Empty _ -> unify_leaders p' p
-  end
-
-let unify p p' =
-  unify_leaders p p'
 
 let fmap f p =
   let (p', fill) = create () in

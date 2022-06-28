@@ -2,7 +2,7 @@ open Actorsocaml
 
 let test _ =
   let actor = object%actor
-    val x = 0
+    val mutable x = 0
     method set n = x <- n
     method wait =
       Multiroundrobin.wait_for (fun _ -> x = 42);

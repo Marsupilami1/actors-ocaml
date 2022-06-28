@@ -10,7 +10,7 @@ open Actorsocaml
 
 let main () =
 let a = object%actor
-  val y = 0
+  val mutable y = 0
   method get = y
   method set n = y <- n
 end in

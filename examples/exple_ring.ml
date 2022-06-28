@@ -3,7 +3,7 @@
 open Actorsocaml
 
 let rec ring_member id = object%actor
-  val next = None
+  val mutable next = None
   val id = id
   method create_ring id size leader =
     if id <= size then begin

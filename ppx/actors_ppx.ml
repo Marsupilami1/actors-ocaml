@@ -135,7 +135,7 @@ module Method = struct
         Actorsocaml.Actor.Actor [%e self_ident]
       in [%e e]]
 
-  let make_private self_name _val_fields meth_field = {
+  let make_private self_name meth_field = {
     meth_field with
     name = private_name meth_field.name;
     flag = Public; (* TODO: solve the "implicitly public method" issue. *)
@@ -234,10 +234,10 @@ module Method = struct
         ]
     }
 
-  let lambda_lift self_name (val_fields : val_desc list) (meth_fields : meth_desc list) =
+  let lambda_lift self_name (meth_fields : meth_desc list) =
     List.concat_map
       (fun field -> [
-           make_private      self_name val_fields field;
+           make_private      self_name field;
            make_async_call   self_name field;
            make_sync_call    self_name field;
            make_coop_call self_name field;
@@ -251,16 +251,18 @@ end
 
 
 let split_fields fields =
-  let worker x (vals, meths) =
+  let worker x (mut_vals, vals, meths) =
     match x.pcf_desc with
-    | Pcf_val (name, _, Cfk_concrete(_, e))  ->
-      ({name = name; expr = e} :: vals, meths)
+    | Pcf_val (name, Mutable, Cfk_concrete(_, e))  ->
+      ({name = name; expr = e} :: mut_vals, vals, meths)
+    | Pcf_val _ ->
+      (mut_vals, x :: vals, meths)
     | Pcf_method(name, flag, Cfk_concrete(Fresh, {pexp_desc = Pexp_poly(f, _); _})) ->
       let args, e = Method.destruct f in
-      (vals, {name; Method.flag = flag; args; expr = e} :: meths)
-    | _ -> (vals, meths)
+      (mut_vals, vals, {name; Method.flag = flag; args; expr = e} :: meths)
+    | _ -> (mut_vals, vals, meths)
   in
-  List.fold_right worker fields ([] , [])
+  List.fold_right worker fields ([] , [], [])
 
 
 let add_val_definition (val_fields : val_desc list) exp =
@@ -331,7 +333,7 @@ let expr_Actor (mapper : mapper) expr = match expr with
   (* object%actor ... end *)
   | [%expr [%actor [%e? {pexp_desc = Pexp_object class_struct; _} as e]]] ->
     (* get all `val` and `method` fields *)
-    let val_fields, meth_fields = split_fields class_struct.pcstr_fields in
+    let mut_val_fields, val_fields, meth_fields = split_fields class_struct.pcstr_fields in
 
     let self_name = begin
       match class_struct.pcstr_self.ppat_desc with
@@ -342,12 +344,13 @@ let expr_Actor (mapper : mapper) expr = match expr with
     let loc = e.pexp_loc in
     let new_fields =
       scheduler_fields @
-      (List.map (Method.field_of_desc ~loc:loc) @@ Method.lambda_lift self_name val_fields meth_fields)
+      val_fields @
+      (List.map (Method.field_of_desc ~loc:loc) @@ Method.lambda_lift self_name meth_fields)
     in
     [%expr
       Actorsocaml.Actor.Actor [%e
         mapper.expr mapper @@
-        add_val_definition val_fields @@ {
+        add_val_definition mut_val_fields @@ {
           e with pexp_desc = Pexp_object {
             pcstr_fields = new_fields;
             pcstr_self = mk_pat_var (make_str self_name)

@@ -15,7 +15,7 @@ let main _ =
   let n = 4 in
   let r = 1000 in
   let f () = Promise.get (ackermann#!compute m n) in
-  let samples = Benchmark.latency1 ~name: "Ackerman(3, 4), liftedb" (Int64.of_int r) f () in
+  let samples = Benchmark.latency1 ~name: "Ackerman(3, 4), lifted" (Int64.of_int r) f () in
   Benchmark.tabulate samples
 
 let _ = Actor.Main.run main

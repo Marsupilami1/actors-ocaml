@@ -9,16 +9,16 @@ Ackerman(3, 4), await: 11.29 WALL (11.44 usr +  0.29 sys = 11.73 CPU) @  4.26/s 
 Ackerman(3, 4), await 4.26/s                    --
 
 ** Forward: 12.1/s
-Latencies for 100000 iterations of "Ackerman(3, 4), awaitb":
-Ackerman(3, 4), awaitb:  0.37 WALL ( 0.56 usr +  0.11 sys =  0.66 CPU) @ 150515.59/s (n=100000)
-                           Rate Ackerman(3, 4), awaitb
-Ackerman(3, 4), awaitb 150516/s                     --
+Latencies for 100000 iterations of "Ackerman(3, 4), forward":
+Ackerman(3, 4), forward:  0.36 WALL ( 0.55 usr +  0.10 sys =  0.65 CPU) @ 153129.27/s (n=100000)
+                            Rate Ackerman(3, 4), forward
+Ackerman(3, 4), forward 153129/s                      --
 
 ** Forward + lifted promise 306/s
-Latencies for 1000 iterations of "Ackerman(3, 4), liftedb":
-Ackerman(3, 4), liftedb:  0.86 WALL ( 1.79 usr +  0.04 sys =  1.83 CPU) @ 545.65/s (n=1000)
-                         Rate Ackerman(3, 4), liftedb
-Ackerman(3, 4), liftedb 546/s                      --
+Latencies for 1000 iterations of "Ackerman(3, 4), lifted":
+Ackerman(3, 4), lifted:  0.84 WALL ( 1.74 usr +  0.05 sys =  1.79 CPU) @ 559.33/s (n=1000)
+                        Rate Ackerman(3, 4), lifted
+Ackerman(3, 4), lifted 559/s                     --
 
 ** Eio.Fiber.fork_promise 331/s
 Latencies for 1000 iterations of "Ackerman(3, 4), await":

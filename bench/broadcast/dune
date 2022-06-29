@@ -1,0 +1,11 @@
+(executable
+ (libraries actorsocaml benchmark)
+ (name bench_broadcast_basic)
+ (preprocess (staged_pps actorsocamlppx))
+ (modules bench_broadcast_basic))
+
+(executable
+ (libraries actorsocaml benchmark)
+ (name bench_broadcast_monad)
+ (preprocess (staged_pps actorsocamlppx))
+ (modules bench_broadcast_monad))

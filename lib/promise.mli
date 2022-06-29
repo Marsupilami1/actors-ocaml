@@ -93,6 +93,9 @@ module Infix : sig
   (** Classic bind infix operator flipped. *)
   val (=<<) : ('a -> 'b t) -> 'a t -> 'b t
 
+  (** Monad sequential operator. *)
+  val (>>) : 'a t -> 'b t -> 'b t
+
   (** Applicative [let], acts like {!fmap}. *)
   val ( let+ ) : 'a t -> ('a -> 'b) -> 'b t
 

@@ -99,6 +99,7 @@ module Infix = struct
     p
   let (>>=) = bind
   let (=<<) f m = m >>= f
+  let (>>) m m' = m >>= (fun _ -> m')
 
   let ( let+ ) p f = f <$> p
   let ( and+ ) x y = (fun x y -> (x, y)) <$> x <*> y

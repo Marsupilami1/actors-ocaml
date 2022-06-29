@@ -1,7 +1,13 @@
 open Effect
 open Effect.Deep
 
-module Chan = Domainslib.Chan
+module Chan = struct
+  type 'a t = 'a Queue.t
+  let make_unbounded () = Queue.create ()
+  let send t p = Queue.push p t
+  let recv_poll t = Queue.take_opt t
+  let peek_poll t = Queue.peek_opt t
+end
 
 exception Stop
 exception Interrupt
@@ -22,6 +28,12 @@ module Queue = struct
     let v = Queue.take q in
     Queue.push v q
 end
+
+
+let (<|>) a b =
+  match a with
+  | None -> b
+  | _ -> a
 
 type actor_info = {fifo : process_queue; mutable current : process Option.t}
 
@@ -57,18 +69,29 @@ let domains : domain_info Array.t =
       }
       in
 
+      let is_process () =
+        (* print_endline "b1"; *)
+        let b = Queue.fold (fun b actor_info ->
+            b <|> actor_info.current <|> Chan.peek_poll actor_info.fifo
+          ) None info.fifos <> None in
+        (* print_endline "b2"; *)
+        b
+      in
+
       let get_next_process () =
         let mutex, condition = info.trigger in
         Mutex.lock mutex;
-
+        (* TODO: merge both function *)
         (* block until a process is available *)
-        let p_count = Atomic.get info.p_count in
-        if p_count = 0 then Condition.wait condition mutex;
-        Atomic.decr info.p_count;
+        while not (is_process ()) do Condition.wait condition mutex done;
 
-        (* info.p_count is not 0 *)
+        let p_count = Atomic.get info.p_count in
+
         (* find the next process to execute *)
+        let i = ref 0 in
         let rec find_process () =
+          incr i;
+          if !i mod 100000000 = 0 then Printf.printf "loop: %d %d\n%!" p_count !i;
           let current_actor_info = Queue.peek info.fifos in
           (* current process, stopped by get *)
           if current_actor_info.current <> None then begin
@@ -83,6 +106,8 @@ let domains : domain_info Array.t =
             | Some res -> (res, current_actor_info)
           end
         in
+
+
         let res = find_process () in
         Queue.rotate info.fifos;
         Mutex.unlock mutex;
@@ -95,16 +120,20 @@ let domains : domain_info Array.t =
         Chan.send queue process;
         Atomic.incr info.p_count;
         Mutex.unlock mutex;
-        Condition.broadcast condition;
+        Condition.signal condition
       in
 
       let rec loop () =
-        let (Process (fill, exec)), current_actor_info = get_next_process () in
+        let (Process (fill, exec)), current_actor_info =
+          get_next_process () in
+        Atomic.decr info.p_count;
         match_with exec () {
-          retc = (fun v -> fill v; loop ());
+          retc = (fun v ->
+              fill v; loop ());
           exnc = (fun e -> match e with
               | Interrupt -> loop ()
-              | _ -> raise e
+              | Stop -> raise Stop
+              | _ -> print_endline @@ Printexc.to_string e; raise e
             );
           effc = fun (type a) (e : a Effect.t) ->
             match e with
@@ -122,12 +151,12 @@ let domains : domain_info Array.t =
               )
             | Promise.Get p -> Some (
                 fun (k : (a, _) continuation) ->
+                  Mutex.lock @@ fst info.trigger;
                   current_actor_info.current <- Some
                       (Process((Obj.magic fill), (fun _ -> continue k (Promise.get p))));
-                  Mutex.lock @@ fst info.trigger;
                   Atomic.incr @@ info.p_count;
                   Mutex.unlock @@ fst info.trigger;
-                  Condition.broadcast @@ snd info.trigger;
+                  Condition.signal @@ snd info.trigger;
                   loop ()
               )
             | Forward f -> Some (
@@ -164,7 +193,7 @@ let push_process data process =
   Chan.send fifo process;
   Atomic.incr p_count;
   Mutex.unlock mutex;
-  Condition.broadcast condition
+  Condition.signal condition
 
 
 let stop _id = ()
@@ -183,11 +212,7 @@ let create () =
    Domain.get_id @@ Option.get domain_info.domain)
 
 let stop_all () =
-  (* for domain = 0 to max_domains - 1 do *)
-  (*   empty_fifos domain; *)
-  (* done; *)
   for _ = 1 to max_domains do
-    (* Clear the process queue *)
     (* Stop the thread *)
     let stopping_actor, _ = create () in
     push_process stopping_actor (Process(ignore, (fun _ -> raise Stop)));

@@ -59,7 +59,7 @@ module Main = struct
       processes = Domainslib.Chan.make_unbounded ();
     }, Domain.self ()
     let stop fifo =
-      push_process fifo (Process(ignore, (fun _ -> Gc.full_major (); raise Stop)));
+      push_process fifo (Process(ignore, (fun _ -> raise Stop)));
   end
 
   let run main =

@@ -166,15 +166,11 @@ We could make the following change:
 
 ``` diff
 -     Promise.await @@ self#!syracuse next
-+     forward @@ self#!syracuse next
++     self#!!syracuse next
 
 ```
 
-The `forward` function, will delegate the fulfillment of the promise to the called actor.
-It will actually unify two promises and stop the function (by raising an exception), so the promise *is* the promise obtained by the `send` call.
-The current promise to fill becomes `Forwarded (Atomic.make p')` where `p'` it the result of `send`.
-
-We use a `union-find` like structure for the forwarded promises, with path compression.
+The `#!!` operator, will delegate the fulfillment of the promise to the called actor, interrupting the current computation.
 
 ## Exemples
 See `example/exple_{pingpong; syracuse}.ml`

@@ -11,12 +11,6 @@
  (modules bench_ackermann_forward))
 
 (executable
- (libraries actorsocaml benchmark)
- (name bench_ackermann_lifted)
- (preprocess (staged_pps actorsocamlppx))
- (modules bench_ackermann_lifted))
-
-(executable
  (libraries actorsocaml benchmark eio_main)
  (name bench_ackermann_eio)
  (modules bench_ackermann_eio))

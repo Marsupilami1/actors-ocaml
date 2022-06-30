@@ -59,7 +59,7 @@ let rec multiplicator n =
           (* divide the matrix by four *)
           let p1, p2, p3, p4 = split_matrix m1 in
           let q1, q2, q3, q4 = split_matrix m2 in
-          let ps = List.map2 (fun a -> a#.compute) children [p1, q1; p2, q4; p3, q1; p4, q4] in
+          let ps = List.map2 (fun a -> a#!compute) children [p1, q1; p2, q4; p3, q1; p4, q4] in
           List.iter Promise.await ps;
           merge_matrix m2 [p1; p2; p3; p4];
           let p1, p2, p3, p4 = split_matrix m1 in

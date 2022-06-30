@@ -42,13 +42,11 @@ type domain_info = {
   fifos : actor_info Queue.t;
   (* trigger to avoid spamming in get_process *)
   trigger : trigger;
-  (* process count *)
-  p_count : int Atomic.t;
   (* Domain in which the actor is runnning *)
   mutable domain : unit Domain.t Option.t;
 }
 
-type t = process_queue * trigger * int Atomic.t
+type t = process_queue * trigger
 
 type _ Effect.t += WaitFor : (unit -> bool) -> unit Effect.t
 let wait_for condition =
@@ -64,7 +62,6 @@ let domains : domain_info Array.t =
       let info = {
         fifos = Queue.create ();
         trigger = (Mutex.create (), Condition.create ());
-        p_count = Atomic.make 0;
         domain = None;
       }
       in
@@ -85,13 +82,8 @@ let domains : domain_info Array.t =
         (* block until a process is available *)
         while not (is_process ()) do Condition.wait condition mutex done;
 
-        let p_count = Atomic.get info.p_count in
-
         (* find the next process to execute *)
-        let i = ref 0 in
         let rec find_process () =
-          incr i;
-          if !i mod 100000000 = 0 then Printf.printf "loop: %d %d\n%!" p_count !i;
           let current_actor_info = Queue.peek info.fifos in
           (* current process, stopped by get *)
           if current_actor_info.current <> None then begin
@@ -118,7 +110,6 @@ let domains : domain_info Array.t =
         let mutex, condition = info.trigger in
         Mutex.lock mutex;
         Chan.send queue process;
-        Atomic.incr info.p_count;
         Mutex.unlock mutex;
         Condition.signal condition
       in
@@ -126,7 +117,6 @@ let domains : domain_info Array.t =
       let rec loop () =
         let (Process (fill, exec)), current_actor_info =
           get_next_process () in
-        Atomic.decr info.p_count;
         match_with exec () {
           retc = (fun v ->
               fill v; loop ());
@@ -154,7 +144,6 @@ let domains : domain_info Array.t =
                   Mutex.lock @@ fst info.trigger;
                   current_actor_info.current <- Some
                       (Process((Obj.magic fill), (fun _ -> continue k (Promise.get p))));
-                  Atomic.incr @@ info.p_count;
                   Mutex.unlock @@ fst info.trigger;
                   Condition.signal @@ snd info.trigger;
                   loop ()
@@ -188,10 +177,9 @@ let domains : domain_info Array.t =
     )
 
 let push_process data process =
-  let fifo, (mutex, condition), p_count = data in
+  let fifo, (mutex, condition) = data in
   Mutex.lock mutex;
   Chan.send fifo process;
-  Atomic.incr p_count;
   Mutex.unlock mutex;
   Condition.signal condition
 
@@ -208,7 +196,7 @@ let create () =
   Mutex.lock mutex;
   Queue.push {fifo = queue; current = None} domain_info.fifos;
   Mutex.unlock mutex;
-  ((queue, domains.(index).trigger, domains.(index).p_count),
+  ((queue, domains.(index).trigger),
    Domain.get_id @@ Option.get domain_info.domain)
 
 let stop_all () =

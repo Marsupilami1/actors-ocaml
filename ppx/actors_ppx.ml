@@ -233,7 +233,7 @@ module Method = struct
            make_private      self_name field;
            make_async_call   self_name field;
            make_sync_call    self_name field;
-           make_coop_call self_name field;
+           make_coop_call    self_name field;
            make_forward_call self_name field;
          ])
       meth_fields

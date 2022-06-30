@@ -38,7 +38,8 @@ let init () =
 let main () =
   init ();
   let r = 10 in
-  let f () = Promise.await @@ (Option.get actors.(0))#.send 5 in
+  let hops = 5 in
+  let f () = Promise.await @@ (Option.get actors.(0))#.send hops in
 
   let samples = Benchmark.latency1 ~name: "Broadcast Monad" (Int64.of_int r) f () in
   Benchmark.tabulate samples

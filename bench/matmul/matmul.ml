@@ -53,20 +53,20 @@ let rec multiplicator n =
     val children = if n = 1 then [] else List.init 4 (fun _ -> multiplicator (n / 2))
     method compute (m1, m2) =
       let size = Array.length m1 in
-      if size = 1 then
-        m1.(0).(0) <- m1.(0).(0) * m2.(0).(0)
-      else begin
-        (* divide the matrix by four *)
-        let p1, p2, p3, p4 = split_matrix m1 in
-        let q1, q2, q3, q4 = split_matrix m2 in
-        let ps = List.map2 (fun a -> a#!compute) children [p1, q1; p2, q4; p3, q1; p4, q4] in
-        List.iter Promise.await ps;
-        merge_matrix m2 [p1; p2; p3; p4];
-        let p1, p2, p3, p4 = split_matrix m1 in
-        let ps = List.map2 (fun a -> a#!compute) children [p2, q3; p1, q3; p4, q2; p3, q2] in
-        List.iter Promise.await ps;
-        merge_matrix m1 [p2; p1; p4; p3];
-        m1 ++ m2
+      match size with
+      | 1 -> m1.(0).(0) <- m1.(0).(0) * m2.(0).(0)
+      | _ -> begin
+          (* divide the matrix by four *)
+          let p1, p2, p3, p4 = split_matrix m1 in
+          let q1, q2, q3, q4 = split_matrix m2 in
+          let ps = List.map2 (fun a -> a#.compute) children [p1, q1; p2, q4; p3, q1; p4, q4] in
+          List.iter Promise.await ps;
+          merge_matrix m2 [p1; p2; p3; p4];
+          let p1, p2, p3, p4 = split_matrix m1 in
+          let ps = List.map2 (fun a -> a#!compute) children [p2, q3; p1, q3; p4, q2; p3, q2] in
+          List.iter Promise.await ps;
+          merge_matrix m1 [p2; p1; p4; p3];
+          m1 ++ m2
         end
   end
 

@@ -97,3 +97,26 @@ Latencies for 10 iterations of "Linked list":
 Linked list:  4.01 WALL (14.12 usr +  0.65 sys = 14.77 CPU) @  0.68/s (n=10)
             s/iter Linked list
 Linked list   1.48          --
+
+* Broadcast
+We consider a complete graph of size ~graph_size~ and a number of hops ~hops~.
+When a node receive a message ~n~, it sends ~n - 1~ to all its neighbors.
+** Basic style: 10 nodes, 5 hops (~ 10^5 messages)
+Latencies for 10 iterations of "Broadcast Basic":
+Broadcast Basic:  7.47 WALL (15.94 usr +  4.56 sys = 20.49 CPU) @  0.49/s (n=10)
+                s/iter Broadcast Basic
+Broadcast Basic   2.05              --
+
+** Monadic style: 10 nodes, 5 hops (~ 10^5 messages)
+Latencies for 10 iterations of "Broadcast Monad":
+Broadcast Monad:  7.45 WALL ( 2.88 usr +  6.19 sys =  9.07 CPU) @  1.10/s (n=10)
+                  Rate Broadcast Monad
+Broadcast Monad 1.10/s              --
+
+* Matmul
+Recursive matrix product, actors split the matrix, send sub computations to other actors, and merge the result
+** 32 * 32
+Latencies for 40 iterations of "Mat Mul":
+Mat Mul:  5.54 WALL (32.33 usr +  2.54 sys = 34.87 CPU) @  1.15/s (n=40)
+          Rate Mat Mul
+Mat Mul 1.15/s      --

@@ -173,4 +173,4 @@ We could make the following change:
 The `#!!` operator, will delegate the fulfillment of the promise to the called actor, interrupting the current computation.
 
 ## Exemples
-See `example/exple_{pingpong; syracuse}.ml`
+See `example/exple_{pingpong, syracuse, ring}.ml`

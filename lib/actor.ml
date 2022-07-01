@@ -12,7 +12,7 @@ let in_same_domain (Actor actor) =
   actor#domain = Domain.self ()
 
 let forward p =
-  Effect.perform @@ Multiroundrobin.Forward (fun fill -> Promise.add_callback p fill)
+  Effect.perform @@ Multiroundrobin.Forward (fun resolver -> Promise.add_callback p (Promise.resolve resolver))
 
 
 module Main = struct
@@ -28,16 +28,16 @@ module Main = struct
       Domainslib.Chan.recv fifo.processes
 
     let rec loop fifo =
-      let Process(fill, exec) = get_process fifo in
+      let Process(r, exec) = get_process fifo in
       match_with exec () {
-        retc = (fun v -> fill v; loop fifo);
+        retc = (fun v -> Promise.resolve r v; loop fifo);
         exnc = raise;
         effc = fun (type a) (e : a Effect.t) ->
           match e with
           | Promise.NotReady p -> Some (
               fun (k : (a, _) continuation) ->
                 Promise.add_callback p (fun v ->
-                    push_process fifo (Process(Obj.magic fill, (fun _ -> continue k v))));
+                    push_process fifo (Process(Obj.magic r, (fun _ -> continue k v))));
                 loop fifo;
             )
           | Promise.Get p -> Some (
@@ -48,9 +48,9 @@ module Main = struct
                 ignore @@ continue k (Promise.get p);
                 loop fifo;
             )
-          | Promise.Async f -> Some (
+          | Promise.Async (r, f) -> Some (
               fun (k : (a, _) continuation) ->
-                push_process fifo (Process(ignore, f));
+                push_process fifo (Process(r, f));
                 ignore @@ continue k ()
             )
           | _ -> None
@@ -58,14 +58,12 @@ module Main = struct
     let create () = {
       processes = Domainslib.Chan.make_unbounded ();
     }, Domain.self ()
-    let stop fifo =
-      push_process fifo (Process(ignore, (fun _ -> raise Stop)));
   end
 
   let run main =
     let fifo = fst @@ MainScheduler.create () in
-    MainScheduler.push_process fifo (Process(ignore, (fun _ ->
-        main (); MainScheduler.stop fifo)));
+    MainScheduler.push_process fifo (Process(Promise.never_resolve (), (fun _ ->
+        main (); raise MainScheduler.Stop)));
     (try MainScheduler.loop fifo with
      | MainScheduler.Stop -> ());
     Multiroundrobin.stop_all ()

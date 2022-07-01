@@ -8,26 +8,36 @@ type 'a status =
   (* An empty promise accumulates callbacks to be executed when it is filled *)
   | Empty of ('a -> unit) list
   | Filled of 'a
+  | Failed of exn
 and 'a t = 'a status Atomic.t
 
-type 'a resolver = 'a -> unit
+type 'a resolver = 'a t
+
+exception Promise__Multiple_Write
 
 let apply_callbacks l v =
   List.iter (fun f -> f v) l
 
-exception Promise__Multiple_Write
-
-let rec fill p v =
+let rec resolve p v =
   match Atomic.get p with
-  | Empty l as x ->
+  | Empty l as x  ->
     if Atomic.compare_and_set p x (Filled v) then
       apply_callbacks l v
-    else fill p v;
-  | Filled _ -> raise Promise__Multiple_Write
+    else resolve p v;
+  | _ -> raise Promise__Multiple_Write
+
+let rec fail p e =
+  match Atomic.get p with
+  | Empty _ as x  ->
+    if Atomic.compare_and_set p x (Failed e) then
+      ()
+    else fail p e;
+  | _ -> raise Promise__Multiple_Write
+
 
 let create () =
   let p = Atomic.make @@ Empty [] in
-  (p, fill p)
+  (p, p)
 
 type _ Effect.t += NotReady : 'a t -> 'a Effect.t
 type _ Effect.t += Get : 'a t -> 'a Effect.t
@@ -37,16 +47,28 @@ let await p =
   match Atomic.get p with
   | Empty _ -> perform @@ NotReady p
   | Filled v -> v
+  | Failed e -> raise e
 
-let get p =
+let await_or_exn p =
   match Atomic.get p with
+  | Empty _ -> let v = perform @@ NotReady p in Ok v
+  | Filled v -> Ok v
+  | Failed e -> Error e
+
+let get p = match Atomic.get p with
   | Empty _ -> perform @@ Get p
   | Filled v -> v
+  | Failed e -> raise e
+
+let get_or_exn p = match Atomic.get p with
+  | Empty _ -> let v = perform @@ Get p in Ok v
+  | Filled v -> Ok v
+  | Failed e -> Error e
 
 let is_ready p =
   match Atomic.get p with
   | Empty _ -> false
-  | Filled _ -> true
+  | _ -> true
 
 (* Add a callback to the given promise *)
 (* If it's already filled, just run the callback *)
@@ -60,40 +82,43 @@ let rec add_callback p f =
       ()
     else add_callback p f
   | Filled v -> f v
+  | Failed e -> raise e
 
 let fmap f p =
-  let (p', fill) = create () in
-  add_callback p (fun v -> fill (f v));
+  let (p', r') = create () in
+  add_callback p (fun v -> resolve r' (f v));
   p'
 
 let pure v = Atomic.make (Filled v)
 
 let return = pure
 
+let never_resolve () = Atomic.make @@ Failed Promise__Multiple_Write
+
 let join pp =
-  let (res, fill) = create () in
-  add_callback pp (fun p -> add_callback p (fun v -> fill v));
+  let (res, r) = create () in
+  add_callback pp (fun p -> add_callback p (fun v -> resolve r v));
   res
 
 let bind m f =
-  let (p, fill) = create () in
-  add_callback m (fun v -> fill (f v));
+  let (p, r) = create () in
+  add_callback m (fun v -> resolve r (f v));
   join p
 
 
-type _ Effect.t += Async : (unit -> unit) -> unit Effect.t
+type _ Effect.t += Async : 'a resolver * (unit -> 'a) -> unit Effect.t
 let async f =
-  let (p, fill) = create () in
-  perform (Async (fun _ -> fill @@ f ()));
+  let (p, r) = create () in
+  perform (Async (r, f));
   p
 
 module Infix = struct
   let (<$>) = fmap
   let (<*>) pf px =
-    let (p, fill) = create () in
+    let (p, r) = create () in
     add_callback pf (
       fun f -> add_callback px (
-          fun x -> fill (f x)
+          fun x -> resolve r (f x)
         )
     );
     p

@@ -22,18 +22,18 @@ let test_applicative () =
   print_endline "Test 3 : Passed"
 
 let test_callback () =
-  let (p, fill) = Promise.create () in
+  let (p, r) = Promise.create () in
   Promise.add_callback p (fun v ->
       Alcotest.(check int) "same int" 42 v);
-  fill 42;
+  Promise.resolve r 42;
   print_endline "Test 4 : Passed"
 
 let test_join () =
-  let (p, fillp) = Promise.create () in
-  let (q, fillq) = Promise.create () in
+  let (p, rp) = Promise.create () in
+  let (q, rq) = Promise.create () in
   let k = Promise.join p in
-  fillp q;
-  fillq 42;
+  Promise.resolve rp q;
+  Promise.resolve rq 42;
   Alcotest.(check int) "same int" 42 (Promise.await k);
   print_endline "Test 5 : Passed"
 

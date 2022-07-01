@@ -9,7 +9,7 @@
 type 'a t
 
 (** Resolver for promise, needed to fulfill. *)
-type 'a resolver = 'a -> unit
+type 'a resolver = 'a t
 
 (** Effect raised by the {!await} function. *)
 type _ Effect.t += NotReady : 'a t -> 'a Effect.t
@@ -18,7 +18,7 @@ type _ Effect.t += NotReady : 'a t -> 'a Effect.t
 type _ Effect.t += Get : 'a t -> 'a Effect.t
 
 (** Effect raised by the {!async} function. *)
-type _ Effect.t += Async : (unit -> unit) -> unit Effect.t
+type _ Effect.t += Async : 'a resolver * (unit -> 'a) -> unit Effect.t
 
 (** Raised when multiple fulfillment occur on the same promise *)
 exception Promise__Multiple_Write
@@ -29,6 +29,12 @@ exception Promise__Multiple_Write
     promise and a [fill] function *)
 val create : unit -> 'a t * 'a resolver
 
+(** [resolve r v] fill the promise assiciated with r with the value [v]. *)
+val resolve : 'a resolver -> 'a -> unit
+
+(** [fail r e] fail the promise assiciated with r. *)
+val fail : 'a resolver -> exn -> unit
+
 (** [pure v] creates a promise with the value [v]
     directly available. *)
 val pure : 'a -> 'a t
@@ -37,14 +43,24 @@ val pure : 'a -> 'a t
     another name. *)
 val return : 'a -> 'a t
 
+(** [never_resolve] returns a resolver alone, with no associated promise. *)
+val never_resolve : unit -> 'a resolver
+
 (** [await p] raise the Effect ({!NotReady} [p])
     if [p] is empty, and return the value if
-    [p] is fulfilled. *)
+    [p] is fulfilled. If p is a failure, raise an exn. *)
 val await : 'a t -> 'a
+
+(** [await_or_exn p] raise the Effect ({!NotReady} [p])
+    if [p] is empty, and return an [('a, exn) result] otherwise. *)
+val await_or_exn : 'a t -> ('a, exn) result
 
 (** [get p] blocks until the result of [p] is available
     and returns it. *)
 val get : 'a t -> 'a
+
+(** [get_or_exn p] is the same as {!await_of_exn} [p], but it may block *)
+val get_or_exn : 'a t -> ('a, exn)  result
 
 (** [is_ready p] checks if the value of [p] is available. *)
 val is_ready : 'a t -> bool

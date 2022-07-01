@@ -76,13 +76,15 @@ type 'a t = 'a status ref
 This type is fine for simple programs, but waiting processes have no way to know when the promise is filled.
 So we add a list of callbacks to the empty future. These callbacks will be executed when the promise it fulfilled.
 Thanks to this, the scheduler can add a callback to a promise to put a waiting process back in the queue (Faster than pushing the process to the queue directly and reading the empty promise again).
+We also want to know if the computation failed, so we add a field `Failed`.
 
 The real `status` type is (the `Forward` constructor is explained in the Forward section):
 ``` ocaml
 type 'a status =
+  (* An empty promise accumulates callbacks to be executed when it is filled *)
   | Empty of ('a -> unit) list
   | Filled of 'a
-  | Forwarded of 'a t Atomic.t
+  | Failed of exn
 and 'a t = 'a status Atomic.t
 ```
 
@@ -91,9 +93,13 @@ This is useful to define functions such as `fmap` and `join` (See `Promise.Infix
 
 #### Creating and writing
 
-You can create a promise with the `create` function, and fill it with `fill`.
+You can create a promise with the `create` function, it will return the promise with its resolver.
+To fill the promise with `v`, you need to call `Promise.resolve r v` on the resolver.
+You can fail a promise with `Promise.fail r exn`.
 
-Trying to fill in the same promise twice raises a `Promise__Multiple_Write` error.
+The resolver should not be shared to other processes, this is the guarantee that only one thread is able to fulfill the promise.
+
+Trying to fill in the same promise twice raises a `Promise__Multiple_Write` exception.
 
 #### Reading
 
@@ -102,19 +108,21 @@ You can also use `get`, which is blocking (In fact, it also raises an effect, bu
 
 Of course, the value will be returned if it is available.
 
+You can also use `await_or_exn` and `get_or_exn` to get `('a, exn) result`.
+
 
 ### Actors
 
 Actors are OCaml object running in their own domain.
 The easiest way to define an actor is to use the `actorsocamlppx` syntax extension.
 It's goal is to make your life easier, cause you do not want (trust me) to write all the code yourself.
-At this time, you can only use `var` and `methods` in your objects: no inheritance, no private fields.
+At this time, you can only use `var` and `method` in your objects: no inheritance, no private fields.
 So this is a valid actor:
 
 ``` ocaml
 object%actor
   val y = 42
-  val get = y
+  method get = y
 end
 ```
 
@@ -173,4 +181,4 @@ We could make the following change:
 The `#!!` operator, will delegate the fulfillment of the promise to the called actor, interrupting the current computation.
 
 ## Exemples
-See `example/exple_{pingpong, syracuse, ring}.ml`
+See `example/exple_{pingpong, syracuse, ring}.ml` and the `test` directory.

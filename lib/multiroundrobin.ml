@@ -115,15 +115,15 @@ let domains : domain_info Array.t =
       in
 
       let rec loop () =
-        let (Process (fill, exec)), current_actor_info =
+        let (Process (resolver, exec)), current_actor_info =
           get_next_process () in
         match_with exec () {
           retc = (fun v ->
-              fill v; loop ());
+              Promise.resolve resolver v; loop ());
           exnc = (fun e -> match e with
               | Interrupt -> loop ()
               | Stop -> raise Stop
-              | _ -> print_endline @@ Printexc.to_string e; raise e
+              | _ -> Promise.fail resolver e; loop ()
             );
           effc = fun (type a) (e : a Effect.t) ->
             match e with
@@ -135,7 +135,7 @@ let domains : domain_info Array.t =
                   Promise.add_callback p (fun v ->
                       push_process current_actor_info.fifo
                         (* The compiler is dumb *)
-                        (Process(Obj.magic(fill), (fun _ -> continue k v)))
+                        (Process(Obj.magic resolver, (fun _ -> continue k v)))
                     );
                   loop ();
               )
@@ -143,19 +143,19 @@ let domains : domain_info Array.t =
                 fun (k : (a, _) continuation) ->
                   Mutex.lock @@ fst info.trigger;
                   current_actor_info.current <- Some
-                      (Process((Obj.magic fill), (fun _ -> continue k (Promise.get p))));
+                      (Process(Obj.magic resolver, (fun _ -> continue k (Promise.get p))));
                   Mutex.unlock @@ fst info.trigger;
                   Condition.signal @@ snd info.trigger;
                   loop ()
               )
             | Forward f -> Some (
                 fun (k : (a, _) continuation) ->
-                  f (Obj.magic fill);
+                  f (Obj.magic resolver);
                   discontinue k Interrupt;
               )
-            | Promise.Async f -> Some (
+            | Promise.Async (r, f) -> Some (
                 fun (k : (a, _) continuation) ->
-                  push_process current_actor_info.fifo (Process((fun _ -> ()), f));
+                  push_process current_actor_info.fifo (Process(r, f));
                   ignore @@ continue k ()
               )
             | WaitFor condition -> Some (
@@ -164,7 +164,7 @@ let domains : domain_info Array.t =
                     ignore @@ continue k ()
                   else (
                     push_process current_actor_info.fifo
-                      (Process((Obj.magic fill),
+                      (Process(Obj.magic resolver,
                                (fun _ -> wait_for condition; continue k ())));
                     loop ()
                   )
@@ -203,7 +203,7 @@ let stop_all () =
   for _ = 1 to max_domains do
     (* Stop the thread *)
     let stopping_actor, _ = create () in
-    push_process stopping_actor (Process(ignore, (fun _ -> raise Stop)));
+    push_process stopping_actor (Process(Promise.never_resolve (), (fun _ -> raise Stop)));
   done;
   for domain = 0 to max_domains - 1 do
     try Domain.join (Option.get @@ domains.(domain).domain) with

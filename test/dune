@@ -22,7 +22,7 @@
  (preprocess (staged_pps actorsocamlppx))
  (modules test_object))
 
-(executable
- (name test_foo)
- (modules test_foo bar)
- (preprocess (staged_pps actorsocamlppx)))
+;(executable
+ ;(name test_foo)
+ ;(modules test_foo bar)
+ ;(preprocess (staged_pps actorsocamlppx)))

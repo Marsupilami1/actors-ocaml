@@ -240,9 +240,6 @@ module Method = struct
 end
 
 
-
-
-
 let split_fields fields =
   let worker x (mut_vals, vals, meths) =
     match x.pcf_desc with
@@ -253,7 +250,8 @@ let split_fields fields =
     | Pcf_method(name, flag, Cfk_concrete(Fresh, {pexp_desc = Pexp_poly(f, _); _})) ->
       let args, e = Method.destruct f in
       (mut_vals, vals, {name; Method.flag = flag; args; expr = e} :: meths)
-    | _ -> (mut_vals, vals, meths)
+    (* TODO: remove todo *)
+    | _ -> failwith "todo"
   in
   List.fold_right worker fields ([] , [], [])
 

@@ -27,10 +27,13 @@ module Main = struct
     let get_process fifo =
       Domainslib.Chan.recv fifo.processes
 
+    (* TODO: avoid handler stacking *)
     let rec loop fifo =
       let Process(r, exec) = get_process fifo in
       match_with exec () {
-        retc = (fun v -> Promise.resolve r v; loop fifo);
+        retc = (fun v ->
+            Promise.resolve r v;
+            (loop [@tailcall]) fifo);
         exnc = raise;
         effc = fun (type a) (e : a Effect.t) ->
           match e with
@@ -38,7 +41,7 @@ module Main = struct
               fun (k : (a, _) continuation) ->
                 Promise.add_callback p (fun v ->
                     push_process fifo (Process(Obj.magic r, (fun _ -> continue k v))));
-                loop fifo;
+                (loop [@tailcall]) fifo;
             )
           | Promise.Get p -> Some (
               fun (k : (a, _) continuation) ->
@@ -46,7 +49,7 @@ module Main = struct
                   Domain.cpu_relax ()
                 done;
                 ignore @@ continue k (Promise.get p);
-                loop fifo;
+                (loop [@tailcall]) fifo;
             )
           | Promise.Async (r, f) -> Some (
               fun (k : (a, _) continuation) ->

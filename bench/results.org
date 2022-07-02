@@ -115,21 +115,3 @@ Broadcast Monad 1.10/s              --
 
 * Matmul
 Recursive matrix product, actors split the matrix, send sub computations to other actors, and merge the result
-** 8 * 8
-Latencies for 1600 iterations of "Mat Mul":
-Mat Mul:  1.43 WALL ( 6.01 usr +  0.77 sys =  6.78 CPU) @ 236.01/s (n=1600)
-         Rate Mat Mul
-Mat Mul 236/s      --
-
-** 16 * 16
-Latencies for 160 iterations of "Mat Mul":
-Mat Mul:  1.10 WALL ( 6.19 usr +  0.61 sys =  6.80 CPU) @ 23.54/s (n=160)
-          Rate Mat Mul
-Mat Mul 23.5/s      --
-
-** 32 * 32
-Latencies for 40 iterations of "Mat Mul":
-Mat Mul:  5.54 WALL (32.33 usr +  2.54 sys = 34.87 CPU) @  1.15/s (n=40)
-          Rate Mat Mul
-Mat Mul 1.15/s      --
-

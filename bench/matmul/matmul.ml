@@ -1,93 +1,71 @@
 open Actorsocaml
+open Bigarray
 
-type 'a computation_tree = Node of 'a Actor.t * 'a computation_tree list
-
-let zip l l' = List.map2 (fun x y -> (x, y)) l l'
-
-let split_matrix m1 =
-  let size = Array.length m1 in
-  let len = size / 2 in
-  let p12 = Array.sub m1 0 len in
-  let p1 = Array.map (fun t -> Array.sub t 0 len) p12 in
-  let p2 = Array.map (fun t -> Array.sub t len len) p12 in
-  let p34 = Array.sub m1 (size / 2) len in
-  let p3 = Array.map (fun t -> Array.sub t 0 len) p34 in
-  let p4 = Array.map (fun t -> Array.sub t len len) p34 in
-  p1, p2, p3, p4
-
-let merge_matrix res l =
-  match l with
-  | [p1; p2; p3; p4] ->
-    let size = Array.length res in
-    let len = size/2 in
-    for i=0 to size-1 do
-      for j=0 to size-1 do
-        let src =
-          if i < len then
-            if j < len then p1.(i).(j) else p3.(i).(j - len)
-          else
-          if j < len then p2.(i - len).(j) else p4.(i - len).(j - len)
-        in res.(i).(j) <- src
+let matmul m1 i1 k1 m2 k2 j2 res ir jr len =
+  for i=0 to len-1 do
+    for j=0 to len-1 do
+      for k=0 to len-1 do
+        res.{ir + i, jr + j} <-
+          res.{ir + i, jr + j} +. m1.{i1 + i, k1 + k} *. m2.{k2 + k, j2 + j}
       done
     done
-  | _ -> ()
+  done
 
 let print_matrix m =
-  let size = Array.length m in
+  let size = Array2.dim1 m in
   for i=0 to size - 1 do
     for j=0 to size - 1 do
-      Printf.printf "%d " m.(i).(j)
+      Printf.printf "%f " @@ m.{i, j}
     done;
     print_newline ()
   done
 
-let (++) m1 m2 =
-  for i=0 to Array.length m1 - 1 do
-    for j=0 to Array.length m1.(i) - 1 do
-      m1.(i).(j) <- m1.(i).(j) + m2.(i).(j)
-    done
-  done
+let rec multiplicator len =
+  if len <= 128 then
+    object%actor
+      method compute m1 i1 k1 m2 k2 j2 res ir jr =
+        matmul m1 i1 k1 m2 k2 j2 res ir jr len
+    end
+  else
+    object%actor
+      val a1 = multiplicator (len/2)
+      val a2 = multiplicator (len/2)
+      val a3 = multiplicator (len/2)
+      val a4 = multiplicator (len/2)
+      method compute m1 i1 k1 m2 k2 j2 res ir jr =
+        let hlen = len / 2 in
+        (* Not very nice but it works *)
+        let p1 = a1#!compute m1 i1 k1 m2 k2 j2 res ir jr    in
+        let p2 = a2#!compute m1 i1 (k1 + hlen) m2 (k2 + hlen) (j2 + hlen) res ir (jr + hlen) in
+        let p3 = a3#!compute m1 (i1 + hlen) k1 m2 k2 j2 res (ir + hlen) jr in
+        let p4 = a4#!compute m1 (i1 + hlen) (k1 + hlen) m2 (k2 + hlen) (j2 + hlen) res (ir + hlen) (jr + hlen) in
+        let p5 = a1#!compute m1 i1 (k1 + hlen) m2 (k2 + hlen) j2 res ir jr    in
+        let p6 = a2#!compute m1 i1 k1 m2 k2 (j2 + hlen) res ir (jr + hlen) in
+        let p7 = a3#!compute m1 (i1 + hlen) k1 m2 (k2 + hlen) j2 res (ir + hlen) jr in
+        let p8 = a4#!compute m1 (i1 + hlen) (k1 + hlen) m2 k2 (j2 + hlen) res (ir + hlen) (jr + hlen) in
 
-let rec multiplicator n =
-  object%actor
-    val children = if n = 1 then [] else List.init 4 (fun _ -> multiplicator (n / 2))
-    method compute (m1, m2) =
-      let size = Array.length m1 in
-      match size with
-      | 1 -> m1.(0).(0) <- m1.(0).(0) * m2.(0).(0)
-      | _ -> begin
-          (* divide the matrix by four *)
-          let p1, p2, p3, p4 = split_matrix m1 in
-          let q1, q2, q3, q4 = split_matrix m2 in
-          let ps = List.map2 (fun a -> a#!compute) children [p1, q1; p2, q4; p3, q1; p4, q4] in
-          List.iter Promise.await ps;
-          merge_matrix m2 [p1; p2; p3; p4];
-          let p1, p2, p3, p4 = split_matrix m1 in
-          let ps = List.map2 (fun a -> a#!compute) children [p2, q3; p1, q3; p4, q2; p3, q2] in
-          List.iter Promise.await ps;
-          merge_matrix m1 [p2; p1; p4; p3];
-          m1 ++ m2
-        end
-  end
+        Promise.await p1; Promise.await p2; Promise.await p3; Promise.await p4;
+        Promise.await p5; Promise.await p6; Promise.await p7; Promise.await p8;
+    end
 
-let random_matrix k n =
-  let a = Array.make_matrix n n 0 in
-  for i = 0 to n - 1 do
-    for j = 0 to n - 1 do
-      a.(i).(j) <- (i + k * j) mod 367
-    done
-  done;
-  a
+let random_matrix n =
+  Array2.init Float64 C_layout n n (fun _ _ -> 1. -. (Random.float 2.0))
+
+let zero n =
+  Array2.create Float64 C_layout n n
 
 let main _ =
-  let n = 32 in
-  let m = multiplicator n in
-  let m1 = random_matrix 17 n in
-  let m2 = random_matrix 7 n in
+  let n = 258 in
+  Random.init 42;
+  let m1 = random_matrix n in
+  let m2 = random_matrix n in
+  let res = zero n in
 
-  let f () = Promise.get (m#!compute (m1, m2)) in
+  let multiplier = multiplicator n in
 
-  let r = 40 in
+  let f () = multiplier#.compute m1 0 0 m2 0 0 res 0 0 in
+
+  let r = 5 in
   let samples = Benchmark.latency1 ~name: "Mat Mul" (Int64.of_int r) f () in
   Benchmark.tabulate samples
 

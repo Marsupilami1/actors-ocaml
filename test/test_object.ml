@@ -1,6 +1,6 @@
 open Actorsocaml
 
-(* let foo : <foo : int; ..> = object (this) *)
+(* let foo = object (this) *)
 (*   method private field = 0 *)
 (*   method foo = *)
 (*     let self = this in *)
@@ -35,7 +35,6 @@ let rec mk_sorter () =
   end
 
 
-
 let main () =
   let a = object%actor
     val mutable y = 0
@@ -50,11 +49,15 @@ let main () =
   let p = b#!get in
   Printf.printf "a.y = %d\n"  @@ (Promise.get p);
 
+
   let l = List.init 100_000 (fun n -> 47 * n mod 367) in
   let sorter = mk_sorter () in
   print_endline "start";
   let _sorted_l = sorter#.sort l in
   print_endline "ok: sorted"
+
+
+
 (* Printf.printf "foo = %d\n"  @@ foo#field *)
 
 let _ = Actor.Main.run main

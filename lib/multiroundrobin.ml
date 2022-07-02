@@ -119,11 +119,13 @@ let domains : domain_info Array.t =
           get_next_process () in
         match_with exec () {
           retc = (fun v ->
-              Promise.resolve resolver v; loop ());
+              Promise.resolve resolver v;
+              (loop [@tailcall]) ();
+            );
           exnc = (fun e -> match e with
-              | Interrupt -> loop ()
+              | Interrupt -> (loop [@tailcall]) ()
               | Stop -> raise Stop
-              | _ -> Promise.fail resolver e; loop ()
+              | _ -> Promise.fail resolver e; (loop [@tailcall]) ()
             );
           effc = fun (type a) (e : a Effect.t) ->
             match e with
@@ -137,7 +139,7 @@ let domains : domain_info Array.t =
                         (* The compiler is dumb *)
                         (Process(Obj.magic resolver, (fun _ -> continue k v)))
                     );
-                  loop ();
+                  (loop [@tailcall]) ();
               )
             | Promise.Get p -> Some (
                 fun (k : (a, _) continuation) ->
@@ -146,7 +148,7 @@ let domains : domain_info Array.t =
                       (Process(Obj.magic resolver, (fun _ -> continue k (Promise.get p))));
                   Mutex.unlock @@ fst info.trigger;
                   Condition.signal @@ snd info.trigger;
-                  loop ()
+                  (loop [@tailcall]) ()
               )
             | Forward f -> Some (
                 fun (k : (a, _) continuation) ->
@@ -166,7 +168,7 @@ let domains : domain_info Array.t =
                     push_process current_actor_info.fifo
                       (Process(Obj.magic resolver,
                                (fun _ -> wait_for condition; continue k ())));
-                    loop ()
+                    (loop [@tailcall]) ()
                   )
               )
             | _ -> None

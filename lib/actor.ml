@@ -14,6 +14,7 @@ let in_same_domain (Actor actor) =
 let forward p =
   Effect.perform @@ Multiroundrobin.Forward (fun resolver -> Promise.add_callback p (Promise.resolve resolver))
 
+let spawn () = Effect.perform Multiroundrobin.Spawn
 
 module Main = struct
   module MainScheduler = struct
@@ -28,20 +29,24 @@ module Main = struct
       Domainslib.Chan.recv fifo.processes
 
     (* TODO: avoid handler stacking *)
-    let rec loop fifo =
+    let rec loop pool fifo =
       let Process(r, exec) = get_process fifo in
       match_with exec () {
         retc = (fun v ->
             Promise.resolve r v;
-            (loop [@tailcall]) fifo);
+            (loop [@tailcall]) pool fifo);
         exnc = raise;
         effc = fun (type a) (e : a Effect.t) ->
           match e with
+          | Multiroundrobin.Spawn -> Some (
+              fun (k : (a, _) continuation) ->
+                continue k (Multiroundrobin.create pool)
+            )
           | Promise.NotReady p -> Some (
               fun (k : (a, _) continuation) ->
                 Promise.add_callback p (fun v ->
                     push_process fifo (Process(Obj.magic r, (fun _ -> continue k v))));
-                (loop [@tailcall]) fifo;
+                (loop [@tailcall]) pool fifo;
             )
           | Promise.Get p -> Some (
               fun (k : (a, _) continuation) ->
@@ -49,7 +54,7 @@ module Main = struct
                   Domain.cpu_relax ()
                 done;
                 ignore @@ continue k (Promise.get p);
-                (loop [@tailcall]) fifo;
+                (loop [@tailcall]) pool fifo;
             )
           | Promise.Async (r, f) -> Some (
               fun (k : (a, _) continuation) ->
@@ -58,17 +63,18 @@ module Main = struct
             )
           | _ -> None
       }
-    let create () = {
-      processes = Domainslib.Chan.make_unbounded ();
-    }, Domain.self ()
+    let create () =
+      { processes = Domainslib.Chan.make_unbounded () },
+      Domain.self (),
+      Multiroundrobin.init ()
   end
 
   let run main =
-    let fifo = fst @@ MainScheduler.create () in
+    let fifo, _main_domain, pool = MainScheduler.create () in
     MainScheduler.push_process fifo (Process(Promise.never_resolve (), (fun _ ->
         main (); raise MainScheduler.Stop)));
-    (try MainScheduler.loop fifo with
+    (try MainScheduler.loop pool fifo with
      | MainScheduler.Stop -> ());
-    Multiroundrobin.stop_all ()
+    Multiroundrobin.stop_all pool
 
 end

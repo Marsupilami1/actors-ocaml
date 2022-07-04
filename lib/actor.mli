@@ -14,7 +14,7 @@ val in_same_domain : 'a t -> bool
 (** [forward p] will fill the current promise with the result of [p]. *)
 val forward : 'a Promise.t -> 'a
 
-
+val spawn : unit -> Multiroundrobin.t * Domain.id
 
 (** The [Main] Actor, which runs the [main] function. *)
 module Main : sig

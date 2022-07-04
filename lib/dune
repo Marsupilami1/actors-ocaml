@@ -1,5 +1,7 @@
 (library
  (libraries domainslib)
  (name actorsocaml)
- (public_name actorsocaml))
+ (public_name actorsocaml)
+ (modules_without_implementation scheduler)
+)
  ;;(modules actor promise))

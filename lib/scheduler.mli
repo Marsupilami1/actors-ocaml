@@ -1,3 +1,4 @@
+
 (* Module type for schedulers. *)
 module type S = sig
   (** [Stop] is raised when the scheduler terminates. *)
@@ -10,14 +11,18 @@ module type S = sig
   (** Effect raised by [forward]. *)
   type _ Stdlib.Effect.t += Forward : ('a Promise.resolver -> unit) -> 'a Stdlib.Effect.t
 
+  type pool
+  
   (** The type of the scheduler. *)
   type t
+
+  type 'a Effect.t += Spawn : (t * Domain.id) Effect.t
 
   (** The type of processes. *)
   type process = Process : ('a Promise.resolver * (unit -> 'a)) -> process
 
   (** [create ()] makes a new scheduler. *)
-  val create : unit -> t * Domain.id
+  val create : pool -> t * Domain.id
 
   (** [push_process s p] adds the process [p] to the
       scheduler [s]. *)

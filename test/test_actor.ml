@@ -1,7 +1,7 @@
 open Actorsocaml
 open Promise.Infix
 
-let fib = object%actor (self)
+let mk_fib () = object%actor (self)
   val a = Array.make 1000 None
   method compute n =
     if a.(n) <> None then
@@ -24,6 +24,7 @@ let test _ =
   print_endline "-----TEST ACTOR-----";
 
   let n = 42 in
+  let fib = mk_fib () in
   let p = Promise.join @@ fib#!compute n in
   Alcotest.(check int) "same int" 267914296 (Promise.await p);
 

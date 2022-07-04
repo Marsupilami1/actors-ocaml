@@ -1,3 +1,5 @@
 include Scheduler.S
 
-val stop_all : unit -> unit
+val init : unit -> pool
+
+val stop_all : pool -> unit

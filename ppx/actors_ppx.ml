@@ -309,7 +309,7 @@ let scheduler_fields =
     Ast_helper.Cf.val_
       (make_str val_field_name)
       Immutable
-      (Cfk_concrete(Fresh, [%expr Actorsocaml.Multiroundrobin.create ()]));
+      (Cfk_concrete(Fresh, [%expr Actorsocaml.Actor.spawn ()]));
     Ast_helper.Cf.method_
       (make_str "scheduler")
       Public

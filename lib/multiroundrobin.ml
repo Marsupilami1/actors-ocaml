@@ -46,6 +46,8 @@ type domain_info = {
   mutable domain : unit Domain.t Option.t;
 }
 
+type pool = domain_info array
+
 type t = process_queue * trigger
 
 type _ Effect.t += WaitFor : (unit -> bool) -> unit Effect.t
@@ -56,16 +58,40 @@ type _ Effect.t += Yield : unit Effect.t
 let yield () =
   perform @@ Yield
 
+type 'a Effect.t += Spawn : (t * Domain.id) Effect.t                        
 
-let domains : domain_info Array.t =
-  Array.init max_domains (fun _ ->
-      let info = {
+let push_process data process =
+  let fifo, (mutex, condition) = data in
+  Mutex.lock mutex;
+  Chan.send fifo process;
+  Mutex.unlock mutex;
+  Condition.signal condition
+
+let stop _id = ()
+
+let create (pool : pool) : t * Domain.id =
+  let id = !spawned_actors in
+  incr spawned_actors;
+  let index = id mod max_domains in
+  let queue = Chan.make_unbounded () in
+  let domain_info = pool.(index) in
+  let mutex = fst domain_info.trigger in
+  Mutex.lock mutex;
+  Queue.push {fifo = queue; current = None} domain_info.fifos;
+  Mutex.unlock mutex;
+  ((queue, pool.(index).trigger),
+   Domain.get_id @@ Option.get domain_info.domain)
+
+let create_pool () : domain_info Array.t =
+  Array.init max_domains (fun _ -> {
         fifos = Queue.create ();
         trigger = (Mutex.create (), Condition.create ());
         domain = None;
       }
-      in
+    )
 
+let spawn_pool pool = 
+  Array.iter (fun info -> 
       let is_process () =
         (* print_endline "b1"; *)
         let b = Queue.fold (fun b actor_info ->
@@ -74,7 +100,6 @@ let domains : domain_info Array.t =
         (* print_endline "b2"; *)
         b
       in
-
       let get_next_process () =
         let mutex, condition = info.trigger in
         Mutex.lock mutex;
@@ -105,7 +130,6 @@ let domains : domain_info Array.t =
         Mutex.unlock mutex;
         res
       in
-
       let push_process queue process =
         let mutex, condition = info.trigger in
         Mutex.lock mutex;
@@ -113,7 +137,6 @@ let domains : domain_info Array.t =
         Mutex.unlock mutex;
         Condition.signal condition
       in
-
       let rec loop () =
         let (Process (resolver, exec)), current_actor_info =
           get_next_process () in
@@ -129,6 +152,10 @@ let domains : domain_info Array.t =
             );
           effc = fun (type a) (e : a Effect.t) ->
             match e with
+            | Spawn -> Some (
+                fun (k : (a, _) continuation) ->
+                  continue k (create pool)
+              )
             | Promise.NotReady p -> Some (
                 fun (k : (a, _) continuation) ->
                   (* The process is waiting for the promise to be filled *)
@@ -175,39 +202,21 @@ let domains : domain_info Array.t =
         } in
       let d = Domain.spawn (fun _ -> loop ()) in
       info.domain <- Some d;
-      info
     )
+    pool
 
-let push_process data process =
-  let fifo, (mutex, condition) = data in
-  Mutex.lock mutex;
-  Chan.send fifo process;
-  Mutex.unlock mutex;
-  Condition.signal condition
+let init () =
+  let pool = create_pool () in
+  spawn_pool pool;
+  pool
 
-
-let stop _id = ()
-
-let create () =
-  let id = !spawned_actors in
-  incr spawned_actors;
-  let index = id mod max_domains in
-  let queue = Chan.make_unbounded () in
-  let domain_info = domains.(index) in
-  let mutex = fst domain_info.trigger in
-  Mutex.lock mutex;
-  Queue.push {fifo = queue; current = None} domain_info.fifos;
-  Mutex.unlock mutex;
-  ((queue, domains.(index).trigger),
-   Domain.get_id @@ Option.get domain_info.domain)
-
-let stop_all () =
-  for _ = 1 to max_domains do
+let stop_all (pool : pool) =
+  for _ = 1 to Array.length pool do
     (* Stop the thread *)
-    let stopping_actor, _ = create () in
+    let stopping_actor, _ = create pool in
     push_process stopping_actor (Process(Promise.never_resolve (), (fun _ -> raise Stop)));
   done;
-  for domain = 0 to max_domains - 1 do
-    try Domain.join (Option.get @@ domains.(domain).domain) with
+  for domain = 0 to Array.length pool - 1 do
+    try Domain.join (Option.get @@ pool.(domain).domain) with
     | Stop -> ()
   done

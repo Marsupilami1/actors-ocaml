@@ -12,26 +12,34 @@ let spawned_actors = ref 0
 let max_domains = 7 (* for 8 cores hardware *)
 
 
-module E = Effect.Shallow
+module E = Effect.Deep
+
 type process =
   | Process : {
       r : 'a Promise.resolver ;
-      k : ('b, 'a) E.continuation ;
+      k : ('b, 'a) process_desc ;
       v : 'b ;
     } -> process
-  | Discontinue : {
-      r : 'a Promise.resolver ;
-      k : ('b, 'a) E.continuation ;
-      exn : exn ;
-    } -> process
-[@@warning "-37"]
+
+and ('b, 'a) process_desc =
+  | Cont of ('b, 'a action) E.continuation
+  | Fun of ('b -> 'a)
+  
+and process_queue = process Chan.t
+
+and actor_info = {fifo : process_queue; mutable current : process Option.t}
+
+and 'a action =
+  | Pass
+  | Return of 'a
+  | Do of ('a Promise.resolver -> actor_info -> 'a action)
+  | Fail of exn
 
 let process r f =
-  Process {r; k = E.fiber f; v = ()}
+  Process {r; k = Fun f; v = ()}
 
-type process_queue = process Chan.t
 type trigger = Mutex.t * Condition.t
-type t = process_queue * trigger    
+type t = process_queue * trigger
 
 module Queue = struct
   include Queue
@@ -52,7 +60,7 @@ let (<|>) a b =
 
 exception Stop
 exception Interrupt
-  
+
 type _ Stdlib.Effect.t += Forward : ('a Promise.resolver -> unit) -> 'a Stdlib.Effect.t
 
 type _ Effect.t += WaitFor : (unit -> bool) -> unit Effect.t
@@ -63,13 +71,11 @@ type _ Effect.t += Yield : unit Effect.t
 let yield () =
   Effect.perform @@ Yield
 
-type 'a Effect.t += Spawn : (t * Domain.id) Effect.t        
+type 'a Effect.t += Spawn : (t * Domain.id) Effect.t
 
 (** Scheduler utilities inside a domain *)
 
 module SchedulerDomain = struct
-
-  type actor_info = {fifo : process_queue; mutable current : process Option.t}
 
   type domain_info = {
     (* data structure for accessing messages *)
@@ -123,28 +129,21 @@ module SchedulerDomain = struct
     Condition.signal condition
 
   let _set_current info current_actor_info process =
-    let mutex, condition = info.trigger in 
+    let mutex, condition = info.trigger in
     Mutex.lock mutex;
     current_actor_info.current <- Some process;
     Mutex.unlock mutex;
-    Condition.signal condition;
-
-  
-  type 'a action =
-    | Pass
-    | Return of 'a
-    | Do of ('a Promise.resolver -> actor_info -> 'a action)
-    | Fail of exn
+    Condition.signal condition
 
   let rec launch get_domain info =
     let retc v = Return v in
     let exnc e = Fail e in
-    let rec h =
+    let h =
       { E. retc; exnc; effc = fun (type a) (e : a Effect.t) ->
-            match e with 
+            match e with
             | Spawn -> Some (
                 fun (k : (a, _) E.continuation) ->
-                  E.continue_with k (create get_domain) h
+                  E.continue k (create get_domain)
               )
             | Promise.NotReady p -> Some (
                 fun (k : (a, _) E.continuation) ->
@@ -154,37 +153,32 @@ module SchedulerDomain = struct
                   Do (fun r current_actor_info ->
                       Promise.add_callback p (fun v ->
                           push_process info current_actor_info.fifo
-                            (* The compiler is dumb *)
-                            (Process{r ; k; v})
+                            (Process{r ; k = Cont k; v})
                         );
                       Pass)
               )
             (* | Promise.Get p -> Some (
              *     fun (k : (a, _) E.continuation) ->
              *       Do (fun r current_actor_info ->
-             *           let k =
-             *             E.fiber (fun () ->
-             *                 loop_on r current_actor_info
-             *                   (E.fiber Promise.get) @@ Obj.magic p)
-             *           in
-             *           let process = Process {r; k ; v = ()} in
-             *           set_current info current_actor_info process;
+             *           let process = Process { r ; k ; v = Promise.get p } in
+             *           _set_current info current_actor_info process;
              *           Pass
              *         )
              *   ) *)
+            (* Todo : Move forward logic here *)
             | Forward f -> Some (
                 fun (k : (a, _) E.continuation) ->
                   Do (fun r _ ->
                       f @@ Obj.magic r;
-                      E.discontinue_with k Interrupt h
+                      E.discontinue k Interrupt
                     )
               )
             | Promise.Async (r, f) -> Some (
                 fun (k : (a, _) E.continuation) ->
                   Do (fun _ current_actor_info ->
                       push_process info current_actor_info.fifo
-                        (Process{r; k = E.fiber f; v = ()});
-                      E.continue_with k () h
+                        (Process{r; k = Fun f; v = ()});
+                      E.continue k ()
                     )
               )
             (* | WaitFor condition -> Some (
@@ -203,28 +197,27 @@ module SchedulerDomain = struct
             | _ -> None}
     in
 
+    let rec exec_action loop r current_actor_info = function
+      | Pass ->
+        (loop [@tailcall]) ()
+      | Return v ->
+        Promise.resolve r v;
+        (loop [@tailcall]) ()
+      | Do f ->
+        exec_action loop r current_actor_info @@ f r current_actor_info
+      | Fail e -> begin match e with
+          | Interrupt -> (loop [@tailcall]) ()
+          | Stop -> raise Stop
+          | _ -> Promise.fail r e; (loop [@tailcall]) ()
+        end
+    in
     let rec loop () =
-      let process, current_actor_info = get_next_process info in
-      let rec exec_action r current_actor_info = function
-        | Pass ->
-          (loop [@tailcall]) ()        
-        | Return v ->
-          Promise.resolve r v;
-          (loop [@tailcall]) ()
-        | Do f ->
-          exec_action r current_actor_info @@ f r current_actor_info
-        | Fail e -> begin match e with
-            | Interrupt -> (loop [@tailcall]) ()
-            | Stop -> raise Stop
-            | _ -> Promise.fail r e; (loop [@tailcall]) ()
-          end
-      in 
-      match process with
-      | Process{r; k; v} ->
-        exec_action r current_actor_info @@ E.continue_with k v h
-      | Discontinue{r; k; exn} ->
-        Promise.fail r exn;
-        exec_action r current_actor_info @@ E.discontinue_with k exn h
+      let Process{r; k; v}, current_actor_info = get_next_process info in
+      let action = match k with
+        | Cont k -> E.continue k v
+        | Fun f -> E.match_with f v h
+      in
+      exec_action loop r current_actor_info action
     in
     loop ()
 
@@ -246,7 +239,7 @@ module SchedulerDomain = struct
 
 end
 
-(** Exported version *)  
+(** Exported version *)
 let push_process data process =
   let fifo, (mutex, condition) = data in
   Mutex.lock mutex;
@@ -268,8 +261,8 @@ module Pool = struct
       )
 
   let get_domain = Array.get
-  
-  let spawn_pool pool = 
+
+  let spawn_pool pool =
     Array.iter (fun info ->
         let d = Domain.spawn (fun _ ->
             SchedulerDomain.launch (get_domain pool) info)
@@ -289,7 +282,7 @@ module Pool = struct
       let stopping_actor, _ = SchedulerDomain.create (get_domain pool) in
       push_process stopping_actor
         (let r = Promise.never_resolve ()
-         and k = Effect.Shallow.fiber (fun _ -> raise Stop)
+         and k = Fun (fun _ -> raise Stop)
          and v = () in
          Process {r;k;v});
     done;
@@ -304,4 +297,3 @@ type pool = Pool.t
 
 let create pool = SchedulerDomain.create @@ Pool.get_domain pool
 let stop = SchedulerDomain.stop
-              

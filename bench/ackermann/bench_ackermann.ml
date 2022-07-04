@@ -25,7 +25,7 @@ module Await = struct
     let ackermann = mk_ackermann () in
     let f () = Promise.get (ackermann#!compute m n) in
     add_samples @@
-    Benchmark.latency1 ~name: "Ackerman(3, 4), await" 30L f ()
+    Benchmark.latency1 ~name: "Ackerman(3, 4), await" 50L f ()
 
   let () = Actor.Main.run main
 end

@@ -1,5 +1,11 @@
 include Scheduler.S
 
-val init : unit -> pool
+module Pool : sig
 
-val stop_all : pool -> unit
+  type t = pool
+
+  val init : unit -> pool
+
+  val stop : pool -> unit
+
+end

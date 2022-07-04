@@ -18,63 +18,82 @@ let spawn () = Effect.perform Multiroundrobin.Spawn
 
 module Main = struct
   module MainScheduler = struct
-    open Effect.Deep
+    module E = Effect.Shallow
     exception Stop
 
-    type process = Process : ('a Promise.resolver * (unit -> 'a)) -> process
+    type process = Process : {
+        r : 'a Promise.resolver ;
+        k : ('b, 'a) E.continuation ;
+        v : 'b ;
+      } -> process
     type t = {processes : process Domainslib.Chan.t;}
     let push_process fifo process =
       Domainslib.Chan.send fifo.processes process
     let get_process fifo =
       Domainslib.Chan.recv fifo.processes
 
-    (* TODO: avoid handler stacking *)
-    let rec loop pool fifo =
-      let Process(r, exec) = get_process fifo in
-      match_with exec () {
-        retc = (fun v ->
-            Promise.resolve r v;
-            (loop [@tailcall]) pool fifo);
+    type 'a action = Done of 'a | Push of ('a Promise.resolver -> unit)
+    
+    let launch pool fifo =
+      let rec h = {E.
+        retc = (fun v -> Done v);
         exnc = raise;
         effc = fun (type a) (e : a Effect.t) ->
           match e with
           | Multiroundrobin.Spawn -> Some (
-              fun (k : (a, _) continuation) ->
-                continue k (Multiroundrobin.create pool)
+              fun (k : (a, _) E.continuation) ->
+                E.continue_with k (Multiroundrobin.create pool) h
             )
           | Promise.NotReady p -> Some (
-              fun (k : (a, _) continuation) ->
-                Promise.add_callback p (fun v ->
-                    push_process fifo (Process(Obj.magic r, (fun _ -> continue k v))));
-                (loop [@tailcall]) pool fifo;
+              fun (k : (a, _) E.continuation) ->
+                Push (fun r -> 
+                    Promise.add_callback p (fun v ->
+                        push_process fifo
+                          (Process{ r; k; v}))
+                  )
             )
           | Promise.Get p -> Some (
-              fun (k : (a, _) continuation) ->
+              fun (k : (a, _) E.continuation) ->
                 while not (Promise.is_ready p) do
                   Domain.cpu_relax ()
                 done;
-                ignore @@ continue k (Promise.get p);
-                (loop [@tailcall]) pool fifo;
+                E.continue_with k (Promise.get p) h
             )
           | Promise.Async (r, f) -> Some (
-              fun (k : (a, _) continuation) ->
-                push_process fifo (Process(r, f));
-                ignore @@ continue k ()
+              fun (k : (a, _) E.continuation) ->
+                push_process fifo (Process{ r; k = E.fiber f; v = () });
+                E.continue_with k () h
             )
           | _ -> None
       }
+      in
+      let rec loop () =
+        let Process{r; k; v} = get_process fifo in
+        match E.continue_with k v h with
+        | Done v ->
+          Promise.resolve r v;
+          loop ()
+        | Push f ->
+          f r;
+          loop ()
+      in
+      loop ()
+
     let create () =
       { processes = Domainslib.Chan.make_unbounded () },
       Domain.self (),
-      Multiroundrobin.init ()
+      Multiroundrobin.Pool.init ()
   end
 
   let run main =
     let fifo, _main_domain, pool = MainScheduler.create () in
-    MainScheduler.push_process fifo (Process(Promise.never_resolve (), (fun _ ->
-        main (); raise MainScheduler.Stop)));
-    (try MainScheduler.loop pool fifo with
+    MainScheduler.push_process fifo
+      (let r = Promise.never_resolve ()
+       and k = Effect.Shallow.fiber (fun _ -> main (); raise MainScheduler.Stop)
+       and v = () in
+       Process {r;k;v});  
+    (try MainScheduler.launch pool fifo with
      | MainScheduler.Stop -> ());
-    Multiroundrobin.stop_all pool
+    Multiroundrobin.Pool.stop pool
 
 end

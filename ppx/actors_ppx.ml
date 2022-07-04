@@ -145,11 +145,11 @@ module Method = struct
       expr = add_self_shadow self_name @@ add_args_var meth_field.args [%expr
           let p, fill = Actorsocaml.Promise.create () in
           Actorsocaml.Actor.send [%e self]
-            (Actorsocaml.Multiroundrobin.Process(fill, (fun _ ->
+            (Actorsocaml.Multiroundrobin.process fill (fun _ ->
                  [%e apply_args meth_field.args @@
                    [%expr [%e mk_send ~loc:loc
                        ([%expr Actorsocaml.Actor.methods [%e self]])
-                       (private_name meth_field.name)]]])));
+                       (private_name meth_field.name)]]]));
           p]
     }
 
@@ -219,11 +219,11 @@ module Method = struct
       expr = add_self_shadow self_name @@ add_args_var meth_field.args [%expr
           Effect.perform @@ Actorsocaml.Multiroundrobin.Forward
             (fun forward -> Actorsocaml.Actor.send [%e self]
-                (Actorsocaml.Multiroundrobin.Process(forward, (fun _ ->
+                (Actorsocaml.Multiroundrobin.process forward (fun _ ->
                      [%e apply_args meth_field.args @@
                        [%expr [%e mk_send ~loc:loc
                            ([%expr Actorsocaml.Actor.methods [%e self]])
-                           (private_name meth_field.name)]]]))));
+                           (private_name meth_field.name)]]])));
         ]
     }
 

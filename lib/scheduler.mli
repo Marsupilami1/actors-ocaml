@@ -19,8 +19,10 @@ module type S = sig
   type 'a Effect.t += Spawn : (t * Domain.id) Effect.t
 
   (** The type of processes. *)
-  type process = Process : ('a Promise.resolver * (unit -> 'a)) -> process
+  type process
 
+  val process : 'a Promise.resolver -> (unit -> 'a) -> process
+  
   (** [create ()] makes a new scheduler. *)
   val create : pool -> t * Domain.id
 

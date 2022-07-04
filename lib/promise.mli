@@ -9,7 +9,7 @@
 type 'a t
 
 (** Resolver for promise, needed to fulfill. *)
-type 'a resolver = 'a t
+type 'a resolver
 
 (** Effect raised by the {!await} function. *)
 type _ Effect.t += NotReady : 'a t -> 'a Effect.t

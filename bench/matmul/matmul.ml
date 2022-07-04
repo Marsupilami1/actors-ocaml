@@ -21,7 +21,8 @@ let print_matrix m =
   done
 
 let rec multiplicator len =
-  if len <= 128 then
+  if len <= 64 then
+  (* if len <= 1024 then *)
     object%actor
       method compute m1 i1 k1 m2 k2 j2 res ir jr =
         matmul m1 i1 k1 m2 k2 j2 res ir jr len
@@ -55,7 +56,7 @@ let zero n =
   Array2.create Float64 C_layout n n
 
 let main _ =
-  let n = 258 in
+  let n = 256 in
   Random.init 42;
   let m1 = random_matrix n in
   let m2 = random_matrix n in
@@ -63,6 +64,7 @@ let main _ =
 
   let multiplier = multiplicator n in
 
+  (* let f () = multiplier#.compute m1 0 0 m2 0 0 res 0 0 in *)
   let f () = multiplier#.compute m1 0 0 m2 0 0 res 0 0 in
 
   let r = 5 in

@@ -114,4 +114,49 @@ Broadcast Monad:  7.45 WALL ( 2.88 usr +  6.19 sys =  9.07 CPU) @  1.10/s (n=10)
 Broadcast Monad 1.10/s              --
 
 * Matmul
-Recursive matrix product, actors split the matrix, send sub computations to other actors, and merge the result
+Recursive matrix product, actors split the matrix, send sub computations to other actors, and merge the result.
+
+** Parallel
+if size <= 64, stop parallelism
+*** n = 128
+Latencies for 100 iterations of "Mat Mul":
+Mat Mul:  3.06 WALL (13.53 usr +  0.06 sys = 13.58 CPU) @  7.36/s (n=100)
+          Rate Mat Mul
+Mat Mul 7.36/s      --
+*** n = 256
+Latencies for 40 iterations of "Mat Mul":
+Mat Mul:  7.92 WALL (51.73 usr +  0.09 sys = 51.81 CPU) @  0.77/s (n=40)
+        s/iter Mat Mul
+Mat Mul   1.30      --
+*** n = 512
+Latencies for 5 iterations of "Mat Mul":
+Mat Mul:  7.53 WALL (49.86 usr +  0.08 sys = 49.94 CPU) @  0.10/s (n=5)
+        s/iter Mat Mul
+Mat Mul   9.99      --
+** Actor but no recursive calls
+*** n = 128
+Latencies for 40 iterations of "Mat Mul":
+Mat Mul:  3.60 WALL ( 8.55 usr +  0.18 sys =  8.72 CPU) @  4.59/s (n=40)
+          Rate Mat Mul
+Mat Mul 4.59/s      --
+*** n = 256
+Latencies for 5 iterations of "Mat Mul":
+Mat Mul:  3.28 WALL ( 7.88 usr +  0.12 sys =  8.01 CPU) @  0.62/s (n=5)
+        s/iter Mat Mul
+Mat Mul   1.60      --
+** Classical
+*** n = 128
+Latencies for 40 iterations of "Mat Mul":
+Mat Mul:  3.60 WALL ( 8.55 usr +  0.18 sys =  8.72 CPU) @  4.59/s (n=40)
+          Rate Mat Mul
+Mat Mul 4.59/s      --
+*** n = 256
+Latencies for 5 iterations of "Mat Mul":
+Mat Mul:  3.11 WALL ( 4.85 usr +  0.18 sys =  5.03 CPU) @  0.99/s (n=5)
+        s/iter Mat Mul
+Mat Mul   1.01      --
+*** n = 512
+Latencies for 5 iterations of "Mat Mul":
+Mat Mul: 26.27 WALL (40.51 usr +  1.74 sys = 42.25 CPU) @  0.12/s (n=5)
+        s/iter Mat Mul
+Mat Mul   8.45      --

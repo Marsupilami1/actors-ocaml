@@ -111,16 +111,20 @@ module SchedulerDomain = struct
     let rec find_process () =
       let current_actor_info = Queue.peek info.fifos in
       (* current process, stopped by get *)
-      if current_actor_info.current <> None then begin
-        let res = Option.get current_actor_info.current in
-        current_actor_info.current <- None;
-        (res, current_actor_info)
-      end
-      (* next process in the queue *)
-      else begin
-        match Chan.recv_poll @@ current_actor_info.fifo with
-        | None -> Queue.rotate info.fifos; find_process ()
-        | Some res -> (res, current_actor_info)
+      if current_actor_info.running then begin
+        if current_actor_info.current <> None then begin
+          let res = Option.get current_actor_info.current in
+          current_actor_info.current <- None;
+          (res, current_actor_info)
+        end
+        (* next process in the queue *)
+        else begin
+          match Chan.recv_poll @@ current_actor_info.fifo with
+          | None -> Queue.rotate info.fifos; find_process ()
+          | Some res -> (res, current_actor_info)
+        end
+      end else begin
+        Queue.rotate info.fifos; find_process ()
       end
     in
     let res = find_process () in

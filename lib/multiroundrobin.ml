@@ -146,91 +146,9 @@ module SchedulerDomain = struct
     Mutex.unlock mutex;
     Condition.signal condition
 
-  let rec launch get_domain info =
-    let retc v = Return v in
-    let exnc e = Fail e in
-    let h =
-      { E. retc; exnc; effc = fun (type a) (e : a Effect.t) ->
-            match e with
-            | Spawn -> Some (
-                fun (k : (a, _) E.continuation) ->
-                  E.continue k (create get_domain)
-              )
-            | Yield -> Some (
-                fun (k : (a, _) E.continuation) ->
-                  Do (fun r current_actor_info ->
-                      push_process info current_actor_info.fifo
-                        (Process{r; k = Cont k; v = ()});
-                      Pass
-                    )
-              )
-            | Promise.NotReady p -> Some (
-                fun (k : (a, _) E.continuation) ->
-                  (* The process is waiting for the promise to be filled *)
-                  (* So we add a callback to this promise to push the process *)
-                  (* back to the queue *)
-                  Do (fun r current_actor_info ->
-                      Promise.add_callback p (fun v ->
-                          push_process info current_actor_info.fifo
-                            (Process{r ; k = Cont k; v})
-                        );
-                      Pass)
-              )
-            | Promise.Get p -> Some (
-                fun (k : (a, _) E.continuation) ->
-                  Do (fun r current_actor_info ->
-                      current_actor_info.running <- false;
-                      Promise.add_callback p (fun v ->
-                          current_actor_info.running <- true;
-                          let process = Process { r ; k = Cont k ; v } in
-                          _set_current info current_actor_info process;
-                        );
-                      Pass
-                    )
-              )
-            | Forward f -> Some (
-                fun (k : (a, _) E.continuation) ->
-                  Do (fun r _ ->
-                      f @@ Obj.magic r;
-                      E.discontinue k Interrupt
-                    )
-              )
-            | Promise.Async (r, f) -> Some (
-                fun (k : (a, _) E.continuation) ->
-                  Do (fun _ current_actor_info ->
-                      push_process info current_actor_info.fifo
-                        (Process{r; k = Fun f; v = ()});
-                      E.continue k ()
-                    )
-              )
-            | _ -> None}
-    in
+  (** Domain creation and destruction *)
 
-    let rec exec_action loop r current_actor_info = function
-      | Pass ->
-        (loop [@tailcall]) ()
-      | Return v ->
-        Promise.resolve r v;
-        (loop [@tailcall]) ()
-      | Do f ->
-        exec_action loop r current_actor_info @@ f r current_actor_info
-      | Fail e -> begin match e with
-          | Interrupt -> (loop [@tailcall]) ()
-          | Stop -> raise Stop
-          | _ -> Promise.fail r e; (loop [@tailcall]) ()
-        end
-    in
-    let rec loop () =
-      let Process{r; k; v}, current_actor_info = get_next_process info in
-      let action = match k with
-        | Cont k -> E.continue k v
-        | Fun f -> E.match_with f v h
-      in
-      exec_action loop r current_actor_info action
-    in
-    loop ()
-
-  and create get_domain : t * Domain.id =
+  let create get_domain : t * Domain.id =
     let id = !spawned_actors in
     incr spawned_actors;
     let index = id mod max_domains in
@@ -243,8 +161,97 @@ module SchedulerDomain = struct
     ((queue, domain_info.trigger),
      Domain.get_id @@ Option.get domain_info.domain)
 
-
   let stop _id = ()
+
+  (** Main loop *)
+
+  type univ_handler = { h : 'a . ('a, 'a action) E.handler }[@@ocaml.unboxed]
+  let mk_handler get_domain info =
+    let retc v = Return v in
+    let exnc e = Fail e in
+    let effc (type a) (e : a Effect.t) =
+      match e with
+      | Spawn -> Some (
+          fun (k : (a, _) E.continuation) ->
+            E.continue k (create get_domain)
+        )
+      | Yield -> Some (
+          fun (k : (a, _) E.continuation) ->
+            Do (fun r current_actor_info ->
+                push_process info current_actor_info.fifo
+                  (Process{r; k = Cont k; v = ()});
+                Pass
+              )
+        )
+      | Promise.NotReady p -> Some (
+          fun (k : (a, _) E.continuation) ->
+            (* The process is waiting for the promise to be filled *)
+            (* So we add a callback to this promise to push the process *)
+            (* back to the queue *)
+            Do (fun r current_actor_info ->
+                Promise.add_callback p (fun v ->
+                    push_process info current_actor_info.fifo
+                      (Process{r ; k = Cont k; v})
+                  );
+                Pass)
+        )
+      | Promise.Get p -> Some (
+          fun (k : (a, _) E.continuation) ->
+            Do (fun r current_actor_info ->
+                current_actor_info.running <- false;
+                Promise.add_callback p (fun v ->
+                    current_actor_info.running <- true;
+                    let process = Process { r ; k = Cont k ; v } in
+                    _set_current info current_actor_info process;
+                  );
+                Pass
+              )
+        )
+      | Forward f -> Some (
+          fun (k : (a, _) E.continuation) ->
+            Do (fun r _ ->
+                f @@ Obj.magic r;
+                E.discontinue k Interrupt
+              )
+        )
+      | Promise.Async (r, f) -> Some (
+          fun (k : (a, _) E.continuation) ->
+            Do (fun _ current_actor_info ->
+                push_process info current_actor_info.fifo
+                  (Process{r; k = Fun f; v = ()});
+                E.continue k ()
+              )
+        )
+      | _ -> None
+    in
+    { h = { E. retc; exnc; effc }}
+
+  let launch get_domain info =
+    let { h } = mk_handler get_domain info in
+    let rec exec_action
+      : 'a .  'a Promise.resolver -> actor_info -> 'a action -> unit
+      = fun r current_actor_info action -> match action with
+        | Pass ->
+          (loop [@tailcall]) ()
+        | Return v ->
+          Promise.resolve r v;
+          (loop [@tailcall]) ()
+        | Do f ->
+          (exec_action [@tailcall]) r current_actor_info (f r current_actor_info)
+        | Fail e -> begin match e with
+            | Interrupt -> (loop [@tailcall]) ()
+            | Stop -> raise Stop
+            | _ -> Promise.fail r e; (loop [@tailcall]) ()
+          end
+    and loop () : unit =
+      let Process{r; k; v}, current_actor_info = get_next_process info in
+      let action = match k with
+        | Cont k -> E.continue k v
+        | Fun f -> E.match_with f v h
+      in
+      (exec_action [@tailcall]) r current_actor_info action
+    in
+    loop ()
 
 end
 

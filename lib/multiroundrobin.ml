@@ -169,60 +169,62 @@ module SchedulerDomain = struct
   let mk_handler get_domain info =
     let retc v = Return v in
     let exnc e = Fail e in
-    let effc (type a) (e : a Effect.t) =
-      match e with
-      | Spawn -> Some (
-          fun (k : (a, _) E.continuation) ->
-            E.continue k (create get_domain)
-        )
-      | Yield -> Some (
-          fun (k : (a, _) E.continuation) ->
-            Do (fun r current_actor_info ->
-                push_process info current_actor_info.fifo
-                  (Process{r; k = Cont k; v = ()});
-                Pass
-              )
-        )
-      | Promise.NotReady p -> Some (
-          fun (k : (a, _) E.continuation) ->
-            (* The process is waiting for the promise to be filled *)
-            (* So we add a callback to this promise to push the process *)
-            (* back to the queue *)
-            Do (fun r current_actor_info ->
-                Promise.add_callback p (fun v ->
-                    push_process info current_actor_info.fifo
-                      (Process{r ; k = Cont k; v})
-                  );
-                Pass)
-        )
-      | Promise.Get p -> Some (
-          fun (k : (a, _) E.continuation) ->
-            Do (fun r current_actor_info ->
-                current_actor_info.running <- false;
-                Promise.add_callback p (fun v ->
-                    current_actor_info.running <- true;
-                    let process = Process { r ; k = Cont k ; v } in
-                    _set_current info current_actor_info process;
-                  );
-                Pass
-              )
-        )
-      | Forward f -> Some (
-          fun (k : (a, _) E.continuation) ->
-            Do (fun r _ ->
-                f @@ Obj.magic r;
-                E.discontinue k Interrupt
-              )
-        )
-      | Promise.Async (r, f) -> Some (
-          fun (k : (a, _) E.continuation) ->
-            Do (fun _ current_actor_info ->
-                push_process info current_actor_info.fifo
-                  (Process{r; k = Fun f; v = ()});
-                E.continue k ()
-              )
-        )
-      | _ -> None
+    let effc
+      : type a b. a Effect.t -> ((a, b action) E.continuation -> b action) option
+      = fun e ->
+        match e with
+        | Spawn -> Some (
+            fun k ->
+              E.continue k (create get_domain)
+          )
+        | Yield -> Some (
+            fun k ->
+              Do (fun r current_actor_info ->
+                  push_process info current_actor_info.fifo
+                    (Process{r; k = Cont k; v = ()});
+                  Pass
+                )
+          )
+        | Promise.NotReady p -> Some (
+            fun k ->
+              (* The process is waiting for the promise to be filled *)
+              (* So we add a callback to this promise to push the process *)
+              (* back to the queue *)
+              Do (fun r current_actor_info ->
+                  Promise.add_callback p (fun v ->
+                      push_process info current_actor_info.fifo
+                        (Process{r ; k = Cont k; v})
+                    );
+                  Pass)
+          )
+        | Promise.Get p -> Some (
+            fun k ->
+              Do (fun r current_actor_info ->
+                  current_actor_info.running <- false;
+                  Promise.add_callback p (fun v ->
+                      current_actor_info.running <- true;
+                      let process = Process { r ; k = Cont k ; v } in
+                      _set_current info current_actor_info process;
+                    );
+                  Pass
+                )
+          )
+        | Forward f -> Some (
+            fun k ->
+              Do (fun r _ ->
+                  f @@ Obj.magic r;
+                  E.discontinue k Interrupt
+                )
+          )
+        | Promise.Async (r, f) -> Some (
+            fun (k : (a, _) E.continuation) ->
+              Do (fun _ current_actor_info ->
+                  push_process info current_actor_info.fifo
+                    (Process{r; k = Fun f; v = ()});
+                  E.continue k ()
+                )
+          )
+        | _ -> None
     in
     { h = { E. retc; exnc; effc }}
 

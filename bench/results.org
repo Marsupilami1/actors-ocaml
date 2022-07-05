@@ -1,61 +1,42 @@
 #+title: Bench results
 
-* Ackerman
-Note that actor creation is not part of the bench.
-** Await: 5.23/s
-Latencies for 50 iterations of "Ackerman(3, 4), await":
-Ackerman(3, 4), await: 11.29 WALL (11.44 usr +  0.29 sys = 11.73 CPU) @  4.26/s (n=50)
-                        Rate Ackerman(3, 4), await
-Ackerman(3, 4), await 4.26/s                    --
+* Tested on
+- CPU: 11th Gen Intel(R) Core(TM) i7-1165G7 @ 2.80GHz (8 cores)
+- RAM: 8 GB
 
-** Forward: 12.1/s
-Latencies for 100000 iterations of "Ackerman(3, 4), forward":
-Ackerman(3, 4), forward:  0.36 WALL ( 0.55 usr +  0.10 sys =  0.65 CPU) @ 153129.27/s (n=100000)
-                            Rate Ackerman(3, 4), forward
-Ackerman(3, 4), forward 153129/s                      --
+* Ackerman(3, 4)
+- Latencies for 500 iterations of "Await":
+  Await:  1.73 WALL ( 5.48 usr +  0.09 sys =  5.57 CPU) @ 89.83/s (n=500)
+- Latencies for 1000 iterations of "EIO":
+  EIO:  2.91 WALL ( 2.90 usr +  0.00 sys =  2.90 CPU) @ 344.42/s (n=1000)
+- Latencies for 1000000 iterations of "Forward":
+  Forward:  2.93 WALL ( 4.64 usr +  1.17 sys =  5.81 CPU) @ 172120.48/s (n=1000000)
 
-** Forward + lifted promise 306/s
-Latencies for 1000 iterations of "Ackerman(3, 4), lifted":
-Ackerman(3, 4), lifted:  0.84 WALL ( 1.74 usr +  0.05 sys =  1.79 CPU) @ 559.33/s (n=1000)
-                        Rate Ackerman(3, 4), lifted
-Ackerman(3, 4), lifted 559/s                     --
-
-** Eio.Fiber.fork_promise 331/s
-Latencies for 1000 iterations of "Ackerman(3, 4), await":
-Ackerman(3, 4), await:  3.03 WALL ( 3.02 usr +  0.00 sys =  3.02 CPU) @ 330.66/s (n=1000)
-                       Rate Ackerman(3, 4), await
-Ackerman(3, 4), await 331/s                    --
+|         | Rate     |   Await |    EIO | Forward |
+|---------+----------+---------+--------+---------|
+| Await   | 89.8/s   |       X |   -74% |   -100% |
+| EIO     | 344/s    |    283% |      X |   -100% |
+| Forward | 172120/s | 191507% | 49875% |       X |
 
 * Factorial
-** Tail recursive (100_000)
-Latencies for 10000 iterations of "fact term fut":
-fact term fut:  1.29 WALL ( 1.29 usr +  0.00 sys =  1.29 CPU) @ 7781.55/s (n=10000)
-                Rate fact term fut
-fact term fut 7782/s            --
+- Latencies for 10000 iterations of "term fut":
+  term fut:  1.29 WALL ( 1.28 usr +  0.00 sys =  1.29 CPU) @ 7781.18/s (n=10000)
+- Latencies for 10000 iterations of "basic fut":
+  basic fut:  1.11 WALL ( 1.77 usr +  0.08 sys =  1.86 CPU) @ 5388.69/s (n=10000)
+- Latencies for 1000 iterations of "monad fut":
+  monad fut:  0.61 WALL ( 1.30 usr +  0.07 sys =  1.37 CPU) @ 730.11/s (n=1000)
+- Latencies for 1000 iterations of "fmap fut":
+  fmap fut:  0.24 WALL ( 0.48 usr +  0.03 sys =  0.51 CPU) @ 1957.33/s (n=1000)
+- Latencies for 10000 iterations of "basic eio":
+  basic eio:  1.38 WALL ( 2.10 usr +  0.11 sys =  2.21 CPU) @ 4520.23/s (n=10000)
 
-** Basic Actorsocaml (10_000)
-Latencies for 10000 iterations of "fact basic fut":
-fact basic fut:  0.91 WALL ( 0.91 usr +  0.00 sys =  0.91 CPU) @ 10957.88/s (n=10000)
-                  Rate fact basic fut
-fact basic fut 10958/s             --
-
-** Basic with monadic let (10_000)
-Latencies for 10000 iterations of "fact basic futm":
-fact basic futm:  4.70 WALL ( 4.70 usr +  0.00 sys =  4.70 CPU) @ 2128.03/s (n=10000)
-                  Rate fact basic futm
-fact basic futm 2128/s              --
-
-** Basic with fmap (10_000)
-Latencies for 10000 iterations of "fact fmap fut":
-fact fmap fut:  2.01 WALL ( 2.01 usr +  0.00 sys =  2.01 CPU) @ 4986.55/s (n=10000)
-                Rate fact fmap fut
-fact fmap fut 4987/s            --
-
-** Basic eio (10_000)
-Latencies for 10000 iterations of "fact basic eio":
-fact basic eio:  1.22 WALL ( 1.21 usr +  0.00 sys =  1.21 CPU) @ 8231.37/s (n=10000)
-                 Rate fact basic eio
-fact basic eio 8231/s             --
+|           | Rate   | monad fut | fmap fut | basic eio | basic fut | term fut |
+|----------+--------+-----------+----------+-----------+-----------+---------- |
+| monad fut | 730/s  |         X |     -63% |      -84% |      -86% |     -91% |
+| fmap fut  | 1957/s |      168% |        X |      -57% |      -64% |     -75% |
+| basic eio | 4520/s |      519% |     131% |         X |      -16% |     -42% |
+| basic fut | 5389/s |      638% |     175% |       19% |         X |     -31% |
+| term fut  | 7781/s |      966% |     298% |       72% |       44% |        X |
 
 * Linked list (Be careful, results are in iter/s _OR_ s/iter)
 System time is significant here.

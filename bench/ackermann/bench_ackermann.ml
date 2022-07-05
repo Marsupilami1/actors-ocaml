@@ -25,7 +25,7 @@ module Await = struct
     let ackermann = mk_ackermann () in
     let f () = Promise.get (ackermann#!compute m n) in
     add_samples @@
-    Benchmark.latency1 ~name: "Ackerman(3, 4), await" 50L f ()
+    Benchmark.latency1 ~name: "Await" 500L f ()
 
   let () = Actor.Main.run main
 end
@@ -46,7 +46,7 @@ module Eio = struct
 
   let main _ =
     let f () = Switch.run (fun sw -> Promise.await (ackermann sw m n)) in
-    add_samples @@ Benchmark.latency1 ~name: "Ackerman(3, 4), eio" 1000L f ()
+    add_samples @@ Benchmark.latency1 ~name: "EIO" 1000L f ()
 
   let () = Eio_main.run main
 end
@@ -68,7 +68,7 @@ module Forward = struct
   let main _ =
     let ackermann = mk_ackermann () in
     let f () = Promise.get (ackermann#!compute m n) in
-    add_samples @@ Benchmark.latency1 ~name: "Ackerman(3, 4), forward" 10000L f ()
+    add_samples @@ Benchmark.latency1 ~name: "Forward" 1000000L f ()
 
   let () = Actor.Main.run main
 end

@@ -226,32 +226,36 @@ module SchedulerDomain = struct
     in
     { h = { E. retc; exnc; effc }}
 
-  let launch get_domain info =
-    let { h } = mk_handler get_domain info in
-    let rec exec_action
-      : 'a .  'a Promise.resolver -> actor_info -> 'a action -> unit
-      = fun r current_actor_info action -> match action with
-        | Pass ->
-          (loop [@tailcall]) ()
-        | Return v ->
-          Promise.resolve r v;
-          (loop [@tailcall]) ()
-        | Do f ->
-          (exec_action [@tailcall]) r current_actor_info (f r current_actor_info)
-        | Fail e -> begin match e with
-            | Interrupt -> (loop [@tailcall]) ()
-            | Stop -> raise Stop
-            | _ -> Promise.fail r e; (loop [@tailcall]) ()
-          end
-    and loop () : unit =
-      let Process{r; k; v}, current_actor_info = get_next_process info in
-      let action = match k with
-        | Cont k -> E.continue k v
-        | Fun f -> E.match_with f v h
-      in
-      (exec_action [@tailcall]) r current_actor_info action
+  let rec exec_action
+    : 'a .
+      domain_info -> actor_info ->
+      univ_handler -> 'a Promise.resolver -> 'a action -> unit
+    = fun info current_actor_info h r action -> match action with
+      | Pass ->
+        (loop [@tailcall]) info h
+      | Return v ->
+        Promise.resolve r v;
+        (loop [@tailcall]) info h
+      | Do f ->
+        (exec_action [@tailcall])
+          info current_actor_info
+          h r (f r current_actor_info)
+      | Fail e -> begin match e with
+          | Interrupt -> (loop [@tailcall]) info h
+          | Stop -> raise Stop
+          | _ -> Promise.fail r e; (loop [@tailcall]) info h
+        end
+  and loop info h : unit =
+    let Process{r; k; v}, current_actor_info = get_next_process info in
+    let action = match k with
+      | Cont k -> E.continue k v
+      | Fun f -> E.match_with f v h.h
     in
-    loop ()
+    (exec_action [@tailcall]) info current_actor_info h r action
+
+  let launch get_domain info =
+    let h0 = mk_handler get_domain info in
+    loop info h0
 
 end
 

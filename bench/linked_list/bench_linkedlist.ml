@@ -1,4 +1,11 @@
 open Actorsocaml
+open Promise.Infix
+
+let samples = ref []
+let add_samples s = samples := s @ !samples
+
+let r = 50L
+let n = 5000
 
 let cell n next = object%actor
   val state = n
@@ -8,13 +15,19 @@ let cell n next = object%actor
     match next with
     | None -> 0
     | Some actor ->
-      state + actor#?sum
+      state + actor#.sum
 
   method sum_term acc =
     match next with
     | None -> acc
     | Some actor ->
-      actor#?sum_term (acc + state)
+      actor#.sum_term (acc + state)
+
+  method sum_monad =
+    match next with
+    | None -> Promise.return 0
+    | Some actor ->
+      ((+) state) <$> Promise.join actor#!sum_monad
 end
 
 let rec generate n =
@@ -23,13 +36,35 @@ let rec generate n =
   else
     cell n @@ Some (generate (n - 1))
 
-let main _ =
-  let n = 10000 in
-  let r = 25 in
-  let nodes = generate n in
-  print_endline "done.";
-  let f () = nodes#.sum_term 0 in
-  let samples = Benchmark.latency1 ~name: "Linked list" (Int64.of_int r) f () in
-  Benchmark.tabulate samples
+module Sum = struct
+  let main () =
+    let nodes = generate n in
+    let f () = nodes#.sum in
+    let samples = Benchmark.latency1 ~name: "Basic" r f () in
+    add_samples samples
 
-let _ = Actor.Main.run main
+  let () = Actor.Main.run main
+end
+
+module SumTerm = struct
+  let main _ =
+    let nodes = generate n in
+    let f () = nodes#.sum_term 0 in
+    let samples = Benchmark.latency1 ~name: "Tail Call" r f () in
+    add_samples samples
+
+  let _ = Actor.Main.run main
+end
+
+module SumMonad = struct
+  let main () =
+    let nodes = generate n in
+    let f () = Promise.get @@ nodes#.sum_monad in
+    let samples = Benchmark.latency1 ~name: "Monad" r f () in
+    add_samples samples
+
+  let () = Actor.Main.run main
+end
+
+let () =
+  Benchmark.tabulate !samples

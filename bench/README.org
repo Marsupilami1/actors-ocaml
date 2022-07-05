@@ -39,45 +39,18 @@
 | term fut  | 7781/s |      966% |     298% |       72% |       44% |        X |
 
 * Linked list (Be careful, results are in iter/s _OR_ s/iter)
-System time is significant here.
-Can not allocate more than 127 Domains (so max 128 with the main domain).
-** Basic
-*** 1000 nodes
-Latencies for 100 iterations of "Linked list":
-Linked list:  1.61 WALL ( 3.72 usr +  0.82 sys =  4.54 CPU) @ 22.04/s (n=100)
-              Rate Linked list
-Linked list 22.0/s          --
+- Latencies for 50 iterations of "Basic":
+  Basic:  8.95 WALL (25.00 usr +  2.92 sys = 27.92 CPU) @  1.79/s (n=50)
+- Latencies for 50 iterations of "Tail Call":
+  Tail Call:  9.05 WALL (25.74 usr +  2.70 sys = 28.44 CPU) @  1.76/s (n=50)
+- Latencies for 50 iterations of "Monad":
+  Monad:  6.75 WALL (21.08 usr +  1.63 sys = 22.71 CPU) @  2.20/s (n=50)
 
-*** 10_000 nodes
-Latencies for 10 iterations of "Linked list":
-Linked list:  5.46 WALL (20.04 usr +  1.28 sys = 21.32 CPU) @  0.47/s (n=10)
-            s/iter Linked list
-Linked list   2.13          --
-
-** Tail recursive
-*** 1000 nodes
-Latencies for 100 iterations of "Linked list":
-Linked list:  1.66 WALL ( 3.63 usr +  0.96 sys =  4.59 CPU) @ 21.79/s (n=100)
-              Rate Linked list
-Linked list 21.8/s          --
-
-*** 1000 nodes forward
-Latencies for 100 iterations of "Linked list":
-Linked list:  1.06 WALL ( 2.21 usr +  0.64 sys =  2.85 CPU) @ 35.11/s (n=100)
-              Rate Linked list
-Linked list 35.1/s          --
-
-*** 10_000 nodes
-Latencies for 10 iterations of "Linked list":
-Linked list:  5.46 WALL (19.52 usr +  1.22 sys = 20.75 CPU) @  0.48/s (n=10)
-            s/iter Linked list
-Linked list   2.07          --
-
-*** 10_000 nodes forward
-Latencies for 10 iterations of "Linked list":
-Linked list:  4.01 WALL (14.12 usr +  0.65 sys = 14.77 CPU) @  0.68/s (n=10)
-            s/iter Linked list
-Linked list   1.48          --
+|           | Rate   | Tail Call | Basic | Monad |
+|-----------+--------+-----------+-------+-------|
+| Tail Call | 1.76/s |         X |   -2% |  -20% |
+| Basic     | 1.79/s |        2% |     X |  -19% |
+| Monad     | 2.20/s |       25% |   23% |     X |
 
 * Broadcast
 We consider a complete graph of size ~graph_size~ and a number of hops ~hops~.

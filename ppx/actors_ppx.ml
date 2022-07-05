@@ -309,15 +309,15 @@ let scheduler_fields =
     Ast_helper.Cf.val_
       (make_str val_field_name)
       Immutable
-      (Cfk_concrete(Fresh, [%expr Actorsocaml.Actor.spawn ()]));
+      (Cfk_concrete(Fresh, [%expr lazy (Actorsocaml.Actor.spawn ())]));
     Ast_helper.Cf.method_
       (make_str "scheduler")
       Public
-      (Cfk_concrete(Fresh, [%expr fst [%e val_field_ident]]));
+      (Cfk_concrete(Fresh, [%expr fst @@ Lazy.force [%e val_field_ident]]));
     Ast_helper.Cf.method_
       (make_str "domain")
       Public
-      (Cfk_concrete(Fresh, [%expr snd [%e val_field_ident]]));
+      (Cfk_concrete(Fresh, [%expr snd @@ Lazy.force [%e val_field_ident]]));
   ]
 
 let expr_Actor (mapper : mapper) expr = match expr with

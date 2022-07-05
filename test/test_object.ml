@@ -7,6 +7,11 @@ open Actorsocaml
 (*     self#field *)
 (* end *)
 
+let a = object%actor
+  method greetings =
+    print_endline "hello"
+end
+
 let split x xs =
   let worker (l, g) e =
     if e < x then (e :: l, g) else (l, e :: g)

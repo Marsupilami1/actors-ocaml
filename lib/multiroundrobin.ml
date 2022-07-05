@@ -24,10 +24,14 @@ type process =
 and ('b, 'a) process_desc =
   | Cont of ('b, 'a action) E.continuation
   | Fun of ('b -> 'a)
-  
+
 and process_queue = process Chan.t
 
-and actor_info = {fifo : process_queue; mutable current : process Option.t}
+and actor_info = {
+  fifo : process_queue;
+  mutable current : process Option.t;
+  mutable running : bool
+}
 
 and 'a action =
   | Pass
@@ -63,13 +67,15 @@ exception Interrupt
 
 type _ Stdlib.Effect.t += Forward : ('a Promise.resolver -> unit) -> 'a Stdlib.Effect.t
 
-type _ Effect.t += WaitFor : (unit -> bool) -> unit Effect.t
-let wait_for condition =
-  Effect.perform @@ WaitFor condition
-
 type _ Effect.t += Yield : unit Effect.t
 let yield () =
   Effect.perform @@ Yield
+
+let wait_for condition =
+  while Fun.negate condition () do
+    yield ()
+  done
+
 
 type 'a Effect.t += Spawn : (t * Domain.id) Effect.t
 
@@ -89,9 +95,10 @@ module SchedulerDomain = struct
   let is_process info =
     (* print_endline "b1"; *)
     let b = Queue.fold (fun b actor_info ->
-        b <|> actor_info.current <|> Chan.peek_poll actor_info.fifo
-      ) None info.fifos <> None in
-    (* print_endline "b2"; *)
+        b <|> (if actor_info.running then
+                 actor_info.current <|> Chan.peek_poll actor_info.fifo
+               else None))
+        None info.fifos <> None in
     b
 
   let get_next_process info =
@@ -145,6 +152,14 @@ module SchedulerDomain = struct
                 fun (k : (a, _) E.continuation) ->
                   E.continue k (create get_domain)
               )
+            | Yield -> Some (
+                fun (k : (a, _) E.continuation) ->
+                  Do (fun r current_actor_info ->
+                      push_process info current_actor_info.fifo
+                        (Process{r; k = Cont k; v = ()});
+                      Pass
+                    )
+              )
             | Promise.NotReady p -> Some (
                 fun (k : (a, _) E.continuation) ->
                   (* The process is waiting for the promise to be filled *)
@@ -157,14 +172,16 @@ module SchedulerDomain = struct
                         );
                       Pass)
               )
-            (* | Promise.Get p -> Some (
-             *     fun (k : (a, _) E.continuation) ->
-             *       Do (fun r current_actor_info ->
-             *           let process = Process { r ; k ; v = Promise.get p } in
-             *           _set_current info current_actor_info process;
-             *           Pass
-             *         )
-             *   ) *)
+            | Promise.Get p -> Some (
+                fun (k : (a, _) E.continuation) ->
+                  Do (fun r current_actor_info ->
+                      current_actor_info.running <- false;
+                      Promise.add_callback p (fun _ -> current_actor_info.running <- true);
+                      let process = Process { r ; k = Cont k ; v = Promise.get p } in
+                      _set_current info current_actor_info process;
+                      Pass
+                    )
+              )
             (* Todo : Move forward logic here *)
             | Forward f -> Some (
                 fun (k : (a, _) E.continuation) ->
@@ -181,19 +198,6 @@ module SchedulerDomain = struct
                       E.continue k ()
                     )
               )
-            (* | WaitFor condition -> Some (
-             *     fun (k : (a, _) E.continuation) ->
-             *       Do (fun r current_actor_info ->
-             *           if condition () then
-             *             E.continue_with k () h
-             *           else (
-             *             push_process info current_actor_info.fifo
-             *               (Process{r; ,
-             *                        (fun _ -> wait_for condition; continue k ())));
-             *             (loop [@tailcall]) ()
-             *           )
-             *         )
-             *   ) *)
             | _ -> None}
     in
 
@@ -229,7 +233,7 @@ module SchedulerDomain = struct
     let domain_info = get_domain index in
     let mutex = fst domain_info.trigger in
     Mutex.lock mutex;
-    Queue.push {fifo = queue; current = None} domain_info.fifos;
+    Queue.push {fifo = queue; current = None; running = true} domain_info.fifos;
     Mutex.unlock mutex;
     ((queue, domain_info.trigger),
      Domain.get_id @@ Option.get domain_info.domain)

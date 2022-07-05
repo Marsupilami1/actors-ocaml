@@ -176,9 +176,11 @@ module SchedulerDomain = struct
                 fun (k : (a, _) E.continuation) ->
                   Do (fun r current_actor_info ->
                       current_actor_info.running <- false;
-                      Promise.add_callback p (fun _ -> current_actor_info.running <- true);
-                      let process = Process { r ; k = Cont k ; v = Promise.get p } in
-                      _set_current info current_actor_info process;
+                      Promise.add_callback p (fun v ->
+                          current_actor_info.running <- true;
+                          let process = Process { r ; k = Cont k ; v } in
+                          _set_current info current_actor_info process;
+                        );
                       Pass
                     )
               )

@@ -18,38 +18,44 @@ let spawn () = Effect.perform Multiroundrobin.Spawn
 
 module Main = struct
   module MainScheduler = struct
-    module E = Effect.Shallow
+    module E = Effect.Deep
     exception Stop
+
+    type 'a action = Done of 'a | Push of ('a Promise.resolver -> unit)
+
+    type ('b, 'a) process_desc =
+      | Cont of ('b, 'a action) E.continuation
+      | Fun of ('b -> 'a)
 
     type process = Process : {
         r : 'a Promise.resolver ;
-        k : ('b, 'a) E.continuation ;
+        k : ('b, 'a) process_desc ;
         v : 'b ;
       } -> process
+
     type t = {processes : process Domainslib.Chan.t;}
     let push_process fifo process =
       Domainslib.Chan.send fifo.processes process
     let get_process fifo =
       Domainslib.Chan.recv fifo.processes
 
-    type 'a action = Done of 'a | Push of ('a Promise.resolver -> unit)
-    
+
     let launch pool fifo =
-      let rec h = {E.
+      let h = {E.
         retc = (fun v -> Done v);
         exnc = raise;
         effc = fun (type a) (e : a Effect.t) ->
           match e with
           | Multiroundrobin.Spawn -> Some (
               fun (k : (a, _) E.continuation) ->
-                E.continue_with k (Multiroundrobin.create pool) h
+                E.continue k (Multiroundrobin.create pool)
             )
           | Promise.NotReady p -> Some (
               fun (k : (a, _) E.continuation) ->
                 Push (fun r -> 
                     Promise.add_callback p (fun v ->
                         push_process fifo
-                          (Process{ r; k; v}))
+                          (Process{ r; k = Cont k; v}))
                   )
             )
           | Promise.Get p -> Some (
@@ -57,19 +63,23 @@ module Main = struct
                 while not (Promise.is_ready p) do
                   Domain.cpu_relax ()
                 done;
-                E.continue_with k (Promise.get p) h
+                E.continue k (Promise.get p)
             )
           | Promise.Async (r, f) -> Some (
               fun (k : (a, _) E.continuation) ->
-                push_process fifo (Process{ r; k = E.fiber f; v = () });
-                E.continue_with k () h
+                push_process fifo (Process{ r; k = Fun f; v = () });
+                E.continue k ()
             )
           | _ -> None
       }
       in
       let rec loop () =
         let Process{r; k; v} = get_process fifo in
-        match E.continue_with k v h with
+        let action = match k with
+        | Cont k -> E.continue k v
+        | Fun f -> E.match_with f v h
+        in
+        match action with
         | Done v ->
           Promise.resolve r v;
           loop ()
@@ -89,9 +99,9 @@ module Main = struct
     let fifo, _main_domain, pool = MainScheduler.create () in
     MainScheduler.push_process fifo
       (let r = Promise.never_resolve ()
-       and k = Effect.Shallow.fiber (fun _ -> main (); raise MainScheduler.Stop)
+       and k = MainScheduler.Fun (fun _ -> main (); raise MainScheduler.Stop)
        and v = () in
-       Process {r;k;v});  
+       Process {r;k;v});
     (try MainScheduler.launch pool fifo with
      | MainScheduler.Stop -> ());
     Multiroundrobin.Pool.stop pool

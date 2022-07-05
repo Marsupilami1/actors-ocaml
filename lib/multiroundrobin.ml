@@ -188,7 +188,6 @@ module SchedulerDomain = struct
                       Pass
                     )
               )
-            (* Todo : Move forward logic here *)
             | Forward f -> Some (
                 fun (k : (a, _) E.continuation) ->
                   Do (fun r _ ->

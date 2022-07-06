@@ -1,5 +1,5 @@
 (executable
- (libraries actorsocaml benchmark)
+ (libraries actorsocaml benchmark domainslib)
  (name matmul)
  (preprocess (staged_pps actorsocamlppx))
  (modules matmul))

@@ -4,7 +4,7 @@
 - CPU: 11th Gen Intel(R) Core(TM) i7-1165G7 @ 2.80GHz (8 cores)
 - RAM: 8 GB
 
-* Ackerman(3, 4)
+* Ackermann(3, 4)
 - Latencies for 500 iterations of "Await":
   Await:  1.74 WALL ( 5.28 usr +  0.10 sys =  5.38 CPU) @ 92.93/s (n=500)
 - Latencies for 2000 iterations of "EIO":
@@ -19,6 +19,27 @@
 |     EIO |   316/s |     17% |      -- |     -9% |  -100% |
 | Forward |   348/s |     28% |     10% |      -- |  -100% |
 |  Native | 79650/s |  29291% |  25120% |  22792% |     -- |
+
+* Syracuse
+Close to Ackermann, but tail recursive
+- Latencies for 2000 iterations of "Await":
+  Await:  1.06 WALL ( 3.10 usr +  0.06 sys =  3.15 CPU) @ 634.56/s (n=2000)
+- Latencies for 5000 iterations of "Eio":
+  Eio:  2.85 WALL ( 2.85 usr +  0.00 sys =  2.85 CPU) @ 1754.39/s (n=5000)
+- Latencies for 10000 iterations of "Forward":
+  Forward:  2.44 WALL ( 7.07 usr +  0.13 sys =  7.20 CPU) @ 1388.23/s (n=10000)
+- Latencies for 100000 iterations of "Sync":
+  Sync:  2.01 WALL ( 3.80 usr +  0.13 sys =  3.93 CPU) @ 25455.27/s (n=100000)
+  Latencies for 1000000 iterations of "Native":
+  Native:  3.32 WALL ( 3.32 usr +  0.00 sys =  3.32 CPU) @ 300905.45/s (n=1000000)
+
+|         |     Rate |    Eio |  Await | Forward  | Sync | Native |
+|---------+----------+--------+--------+----------+------+--------|
+|     Eio |   1753/s |     -- |    -2% |    -55%  | -96% |   -99% |
+|   Await |   1785/s |     2% |     -- |    -54%  | -96% |   -99% |
+| Forward |   3879/s |   121% |   117% |      --  | -92% |   -99% |
+|    Sync |  46838/s |  2572% |  2524% |   1108%  |   -- |   -84% |
+|  Native | 300769/s | 17059% | 16749% |   7654%  | 542% |     -- |
 
 * Factorial
 - Latencies for 10000 iterations of "term fut":
@@ -39,6 +60,7 @@
 | basic eio | 4520/s |      519% |     131% |         X |      -16% |     -42% |
 | basic fut | 5389/s |      638% |     175% |       19% |         X |     -31% |
 | term fut  | 7781/s |      966% |     298% |       72% |       44% |        X |
+
 
 * Linked list
 - Latencies for 50 iterations of "Basic":

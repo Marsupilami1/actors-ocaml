@@ -1,0 +1,4 @@
+(executable
+ (libraries eio_main actorsocaml benchmark)
+ (name bench_syracuse)
+ (preprocess (staged_pps actorsocamlppx)))

@@ -218,12 +218,11 @@ module Method = struct
       name = meth_forward_name meth_field.name;
       expr = add_self_shadow self_name @@ add_args_var meth_field.args [%expr
           Effect.perform @@ Actorsocaml.Multiroundrobin.Forward
-            (fun forward -> Actorsocaml.Actor.send [%e self]
-                (Actorsocaml.Multiroundrobin.process forward (fun _ ->
-                     [%e apply_args meth_field.args @@
-                       [%expr [%e mk_send ~loc:loc
-                           ([%expr Actorsocaml.Actor.methods [%e self]])
-                           (private_name meth_field.name)]]])));
+            (fun _ ->
+               [%e apply_args meth_field.args @@
+                 [%expr [%e mk_send ~loc:loc
+                     ([%expr Actorsocaml.Actor.methods [%e self]])
+                     (private_name meth_field.name)]]]);
         ]
     }
 

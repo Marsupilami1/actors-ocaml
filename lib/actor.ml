@@ -12,7 +12,7 @@ let in_same_domain (Actor actor) =
   actor#domain = Domain.self ()
 
 let forward p =
-  Effect.perform @@ Multiroundrobin.Forward (fun resolver -> Promise.add_callback p (Promise.resolve resolver))
+  Effect.perform @@ Multiroundrobin.Unify p
 
 let spawn () = Effect.perform Multiroundrobin.Spawn
 

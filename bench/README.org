@@ -6,17 +6,19 @@
 
 * Ackerman(3, 4)
 - Latencies for 500 iterations of "Await":
-  Await:  1.73 WALL ( 5.48 usr +  0.09 sys =  5.57 CPU) @ 89.83/s (n=500)
-- Latencies for 1000 iterations of "EIO":
-  EIO:  2.91 WALL ( 2.90 usr +  0.00 sys =  2.90 CPU) @ 344.42/s (n=1000)
-- Latencies for 1000000 iterations of "Forward":
-  Forward:  2.93 WALL ( 4.64 usr +  1.17 sys =  5.81 CPU) @ 172120.48/s (n=1000000)
-
-|         | Rate     |   Await |    EIO | Forward |
-|---------+----------+---------+--------+---------|
-| Await   | 89.8/s   |       X |   -74% |   -100% |
-| EIO     | 344/s    |    283% |      X |   -100% |
-| Forward | 172120/s | 191507% | 49875% |       X |
+  Await:  1.74 WALL ( 5.28 usr +  0.10 sys =  5.38 CPU) @ 92.93/s (n=500)
+- Latencies for 2000 iterations of "EIO":
+  EIO:  6.33 WALL ( 6.33 usr +  0.00 sys =  6.33 CPU) @ 316.01/s (n=2000)
+- Latencies for 2000 iterations of "Forward":
+  Forward:  5.53 WALL (16.68 usr +  0.22 sys = 16.90 CPU) @ 118.34/s (n=2000)
+- Latencies for 100000 iterations of "Native":
+  Native:  1.26 WALL ( 1.26 usr +  0.00 sys =  1.26 CPU) @ 79674.74/s (n=100000)
+|         |    Rate |   Await |     EIO | Forward | Native |
+|---------+---------+---------+---------+---------+--------|
+|   Await |   271/s |      -- |    -14% |    -22% |  -100% |
+|     EIO |   316/s |     17% |      -- |     -9% |  -100% |
+| Forward |   348/s |     28% |     10% |      -- |  -100% |
+|  Native | 79650/s |  29291% |  25120% |  22792% |     -- |
 
 * Factorial
 - Latencies for 10000 iterations of "term fut":
@@ -38,19 +40,19 @@
 | basic fut | 5389/s |      638% |     175% |       19% |         X |     -31% |
 | term fut  | 7781/s |      966% |     298% |       72% |       44% |        X |
 
-* Linked list (Be careful, results are in iter/s _OR_ s/iter)
+* Linked list
 - Latencies for 50 iterations of "Basic":
-  Basic:  8.95 WALL (25.00 usr +  2.92 sys = 27.92 CPU) @  1.79/s (n=50)
+  Basic:  9.20 WALL (25.53 usr +  2.90 sys = 28.43 CPU) @  1.76/s (n=50)
 - Latencies for 50 iterations of "Tail Call":
-  Tail Call:  9.05 WALL (25.74 usr +  2.70 sys = 28.44 CPU) @  1.76/s (n=50)
+  Tail Call:  8.89 WALL (25.35 usr +  2.52 sys = 27.88 CPU) @  1.79/s (n=50)
 - Latencies for 50 iterations of "Monad":
-  Monad:  6.75 WALL (21.08 usr +  1.63 sys = 22.71 CPU) @  2.20/s (n=50)
+  Monad:  2.59 WALL ( 5.13 usr +  1.22 sys =  6.36 CPU) @  7.87/s (n=50)
 
-|           | Rate   | Tail Call | Basic | Monad |
-|-----------+--------+-----------+-------+-------|
-| Tail Call | 1.76/s |         X |   -2% |  -20% |
-| Basic     | 1.79/s |        2% |     X |  -19% |
-| Monad     | 2.20/s |       25% |   23% |     X |
+|           |   Rate |   Basic | Tail Call  |   Monad |
+|-----------+--------+---------+------------+---------|
+|     Basic | 4.13/s |      -- |       -6%  |    -68% |
+| Tail Call | 4.38/s |      6% |        --  |    -67% |
+|     Monad | 13.1/s |    217% |      199%  |      -- |
 
 * Broadcast
 We consider a complete graph of size ~graph_size~ and a number of hops ~hops~.
@@ -68,15 +70,16 @@ Broadcast Monad:  7.45 WALL ( 2.88 usr +  6.19 sys =  9.07 CPU) @  1.10/s (n=10)
 Broadcast Monad 1.10/s              --
 
 * Matmul
-** n = 1024
-- Latencies for 4 iterations of "Actor":
-  Actor:  5.50 WALL (40.49 usr +  0.00 sys = 40.49 CPU) @  0.10/s (n=4)
-- Latencies for 4 iterations of "Domainslib":
-  Domainslib:  4.94 WALL (39.07 usr +  0.00 sys = 39.07 CPU) @  0.10/s (n=4)
-- Latencies for 4 iterations of "Nothing":
-  Nothing: 11.11 WALL (11.10 usr +  0.00 sys = 11.10 CPU) @  0.36/s (n=4)
-|            | s/iter | Actor | Domainslib | Nothing |
-|------------+--------+-------+------------+---------|
-| Actor      |   10.1 |     X |        -3% |    -73% |
-| Domainslib |   9.77 |    4% |          X |    -72% |
-| Nothing    |   2.77 |  265% |       252% |       X |
+** n = 512
+- Latencies for 40 iterations of "Actor":
+  Actor:  4.47 WALL (34.05 usr +  0.02 sys = 34.07 CPU) @  1.17/s (n=40)
+- Latencies for 40 iterations of "Domainslib":
+  Domainslib:  3.96 WALL (31.25 usr +  0.04 sys = 31.28 CPU) @  1.28/s (n=40)
+- Latencies for 40 iterations of "Nothing":
+  Nothing: 12.43 WALL (12.41 usr +  0.00 sys = 12.41 CPU) @  3.22/s (n=40)
+
+| Rate              | Nothing | Actor | Domainslib |
+|-------------------+---------+-------+------------|
+| Nothing 3.22/s    |      -- |  -64% |       -68% |
+| Actor 8.90/s      |    176% |    -- |       -11% |
+| Domainslib 10.0/s |    211% |   12% |         -- |

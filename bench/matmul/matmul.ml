@@ -3,8 +3,8 @@ open Actorsocaml
 let samples = ref []
 let add_samples s = samples := s @ !samples
 
-let n = 1024
-let r = 4L
+let n = 512
+let r = 40L
 
 
 let random_matrix n =
@@ -101,5 +101,8 @@ module With_Nothing = struct
     add_samples samples
 end
 
+let process_samples samples =
+  List.map (fun (s, ts) -> (s, List.map (fun t -> {t with Benchmark.utime = t.Benchmark.wall}) ts)) samples
+
 let () =
-  Benchmark.tabulate !samples
+  Benchmark.tabulate @@ process_samples !samples

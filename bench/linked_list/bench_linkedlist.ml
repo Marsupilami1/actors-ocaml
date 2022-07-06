@@ -66,5 +66,8 @@ module SumMonad = struct
   let () = Actor.Main.run main
 end
 
+let process_samples samples =
+  List.map (fun (s, ts) -> (s, List.map (fun t -> {t with Benchmark.utime = t.Benchmark.wall}) ts)) samples
+
 let () =
-  Benchmark.tabulate !samples
+  Benchmark.tabulate @@ process_samples !samples

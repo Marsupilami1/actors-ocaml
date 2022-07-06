@@ -46,7 +46,7 @@ module Eio = struct
 
   let main _ =
     let f () = Switch.run (fun sw -> Promise.await (ackermann sw m n)) in
-    add_samples @@ Benchmark.latency1 ~name: "EIO" 1000L f ()
+    add_samples @@ Benchmark.latency1 ~name: "EIO" 2000L f ()
 
   let () = Eio_main.run main
 end
@@ -61,17 +61,33 @@ module Forward = struct
       | (_, 0) ->
         self#!!compute (m - 1) 1
       | _ ->
-        let vz = self#.compute m (n - 1) in
-        self#!!compute (m - 1) vz
+        self#!!compute (m - 1) (Promise.await @@ self#!compute m (n - 1))
   end
 
   let main _ =
     let ackermann = mk_ackermann () in
     let f () = Promise.get (ackermann#!compute m n) in
-    add_samples @@ Benchmark.latency1 ~name: "Forward" 1000000L f ()
+    add_samples @@ Benchmark.latency1 ~name: "Forward" 2000L f ()
 
   let () = Actor.Main.run main
 end
 
-let () =
-  Benchmark.tabulate !samples
+module Native = struct
+  let rec ackermann m n =
+    match m, n with
+    | (0, _) -> n + 1
+    | (_, 0) ->
+      ackermann (m - 1) 1
+    | _ ->
+      let z = ackermann m (n - 1) in
+      ackermann (m - 1) z
+
+  let () =
+    let f () = ackermann m n in
+    add_samples @@ Benchmark.latency1 ~name: "Native" 100000L f ()
+end
+
+let process_samples samples =
+  List.map (fun (s, ts) -> (s, List.map (fun t -> {t with Benchmark.utime = t.Benchmark.wall}) ts)) samples
+
+let () = Benchmark.tabulate @@ process_samples !samples

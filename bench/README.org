@@ -95,6 +95,20 @@ Broadcast Monad:  7.45 WALL ( 2.88 usr +  6.19 sys =  9.07 CPU) @  1.10/s (n=10)
                   Rate Broadcast Monad
 Broadcast Monad 1.10/s              --
 
+* Ring
+- Latencies for 50 iterations of "Await":
+  Await:  7.19 WALL (13.05 usr +  4.49 sys = 17.55 CPU) @  2.85/s (n=50)
+- Latencies for 50 iterations of "Sync":
+  Sync:  7.45 WALL (13.54 usr +  4.61 sys = 18.15 CPU) @  2.76/s (n=50)
+- Latencies for 100 iterations of "Forward":
+  Forward:  4.94 WALL ( 7.85 usr +  3.53 sys = 11.39 CPU) @  8.78/s (n=100)
+
+|         | Rate   | Sync | Await | Forward |
+|---------+--------+------+-------+---------|
+| Sync    | 4.15/s |   -- |   -3% |    -65% |
+| Await   | 4.28/s |   3% |    -- |    -64% |
+| Forward | 11.8/s | 185% |  176% |      -- |
+
 * Matmul
 ** n = 512
 - Latencies for 40 iterations of "Actor":

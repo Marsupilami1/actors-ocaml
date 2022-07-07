@@ -65,8 +65,7 @@ let (<|>) a b =
 exception Stop
 exception Interrupt
 
-(* type _ Stdlib.Effect.t += Forward : ('a Promise.resolver -> unit) -> 'a Stdlib.Effect.t *)
-type _ Stdlib.Effect.t += Forward : (unit -> 'a) -> 'a Stdlib.Effect.t
+type _ Stdlib.Effect.t += Forward : ('a Promise.resolver -> unit) -> 'a Stdlib.Effect.t
 type _ Stdlib.Effect.t += Unify : 'a Promise.t -> 'a Stdlib.Effect.t
 
 type _ Effect.t += Yield : unit Effect.t
@@ -213,9 +212,10 @@ module SchedulerDomain = struct
           )
         | Forward f -> Some (
             fun k ->
-              Do (fun r current_actor_info ->
-                  push_process info current_actor_info.fifo
-                    (Process{r; k = Fun (Obj.magic f); v = ()});
+              Do (fun r _ ->
+                  f @@ Obj.magic r;
+                  (* push_process info current_actor_info.fifo *)
+                  (*   (Process{r; k = Fun (Obj.magic f); v = ()}); *)
                   E.discontinue k Interrupt
                 )
           )

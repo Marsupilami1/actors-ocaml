@@ -1,0 +1,5 @@
+(executable
+ (libraries actorsocaml benchmark)
+ (name bench_ring)
+ (preprocess (staged_pps actorsocamlppx))
+ (modules bench_ring))

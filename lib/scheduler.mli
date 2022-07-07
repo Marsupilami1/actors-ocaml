@@ -9,8 +9,7 @@ module type S = sig
   exception Interrupt
 
   (** Effect raised by [forward]. *)
-  (* type _ Stdlib.Effect.t += Forward : ('a Promise.resolver -> unit) -> 'a Stdlib.Effect.t *)
-  type _ Stdlib.Effect.t += Forward : (unit -> 'a) -> 'a Stdlib.Effect.t
+  type _ Stdlib.Effect.t += Forward : ('a Promise.resolver -> unit) -> 'a Stdlib.Effect.t
 
   type pool
   

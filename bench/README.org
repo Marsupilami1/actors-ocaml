@@ -6,19 +6,23 @@
 
 * Ackermann(3, 4)
 - Latencies for 500 iterations of "Await":
-  Await:  1.74 WALL ( 5.28 usr +  0.10 sys =  5.38 CPU) @ 92.93/s (n=500)
+  Await:  1.78 WALL ( 5.34 usr +  0.09 sys =  5.43 CPU) @ 92.16/s (n=500)
 - Latencies for 2000 iterations of "EIO":
-  EIO:  6.33 WALL ( 6.33 usr +  0.00 sys =  6.33 CPU) @ 316.01/s (n=2000)
+  EIO:  5.92 WALL ( 5.91 usr +  0.00 sys =  5.91 CPU) @ 338.15/s (n=2000)
 - Latencies for 2000 iterations of "Forward":
-  Forward:  5.53 WALL (16.68 usr +  0.22 sys = 16.90 CPU) @ 118.34/s (n=2000)
+  Forward:  5.49 WALL (16.46 usr +  0.26 sys = 16.72 CPU) @ 119.61/s (n=2000)
+- Latencies for 10000 iterations of "Sync":
+  Sync:  1.54 WALL ( 3.06 usr +  0.01 sys =  3.07 CPU) @ 3257.16/s (n=10000)
 - Latencies for 100000 iterations of "Native":
-  Native:  1.26 WALL ( 1.26 usr +  0.00 sys =  1.26 CPU) @ 79674.74/s (n=100000)
-|         |    Rate |   Await |     EIO | Forward | Native |
-|---------+---------+---------+---------+---------+--------|
-|   Await |   271/s |      -- |    -14% |    -22% |  -100% |
-|     EIO |   316/s |     17% |      -- |     -9% |  -100% |
-| Forward |   348/s |     28% |     10% |      -- |  -100% |
-|  Native | 79650/s |  29291% |  25120% |  22792% |     -- |
+  Native:  1.23 WALL ( 1.23 usr +  0.00 sys =  1.23 CPU) @ 81612.07/s (n=100000)
+
+|         |      Rate |  Await  |    EIO | Forward |  Sync | Native |
+|---------+-----------+---------+--------+---------+-------+--------|
+|   Await |   267/s   |     --  |   -21% |    -23% |  -96% |  -100% |
+|     EIO |   338/s   |    27%  |     -- |     -3% |  -95% |  -100% |
+| Forward |   348/s   |    30%  |     3% |      -- |  -95% |  -100% |
+|    Sync |  6447/s   |  2314%  |  1808% |   1751% |    -- |   -92% |
+|  Native | 81585/s   | 30450%  | 24039% |  23321% | 1165% |     -- |
 
 * Syracuse
 Close to Ackermann, but tail recursive

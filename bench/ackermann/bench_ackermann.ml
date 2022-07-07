@@ -72,6 +72,27 @@ module Forward = struct
   let () = Actor.Main.run main
 end
 
+module Sync = struct
+  open Actorsocaml
+
+  let mk_ackermann () = object%actor (self)
+    method compute m n =
+      match m, n with
+      | (0, _) -> n + 1
+      | (_, 0) ->
+        self#.compute (m - 1) 1
+      | _ ->
+        self#.compute (m - 1) (self#.compute m (n - 1))
+  end
+
+  let main _ =
+    let ackermann = mk_ackermann () in
+    let f () = Promise.get (ackermann#!compute m n) in
+    add_samples @@ Benchmark.latency1 ~name: "Sync" 10000L f ()
+
+  let () = Actor.Main.run main
+end
+
 module Native = struct
   let rec ackermann m n =
     match m, n with

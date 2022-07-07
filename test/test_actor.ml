@@ -20,7 +20,7 @@ let mk_fib () = object%actor (self)
     end
 end
 
-let test _ =
+let test_fib _ =
   print_endline "-----TEST ACTOR-----";
 
   let n = 42 in
@@ -31,12 +31,20 @@ let test _ =
   print_endline "Test passed";
   print_endline "--------------------"
 
+let test_forward_in_sync _ =
+  let o = object%actor (_self)
+    method bar = Actor.forward (Promise.pure 41)
+    method foo = 1 + _self#?bar
+  end in
+  let p = o#!foo in
+  Alcotest.(check int) "same int" 42 @@ Promise.await p
 
 let main _ =
   let open Alcotest in
   run "Actorsocaml Actor test" [
     "Actor", [
-      test_case "fib" `Quick test;
+      test_case "fib" `Quick test_fib;
+      test_case "forward in sync call" `Quick test_forward_in_sync;
     ];
   ]
 

@@ -1,0 +1,28 @@
+#+title: Actorsocaml's Todo
+
+- Doc pour les objets mutables dans les val d'un acteur
+- Rajouter un flag à côté des promesses pour ne pas les remplir avec un forward dans un appel synchrone
+
+- Passer les flags de compilation au name_resolver
+- Résoudre les problèmes de l'extension de syntaxe (actuellement impossible d'utiliser un object avec champ mutable qui n'est pas un acteur)
+
+- Ajouter plus de tests
+
+- Cacher les méthodes avec l'astuce
+  #+begin_src ocaml
+let _ : <foo : 'a; ..> = self in (Obj.magic self)#bar : 'a)
+  #+end_src
+
+- Ne build pas avec une version de dune >= 3
+
+- solve "unused self" in
+  #+begin_src ocaml
+let o = object%actor (self)
+  method bar = 41
+  method foo = 1 + self#?bar
+end
+  #+end_src
+
+- Adapter le nombre de cpu
+- erreurs lors de la réécriture: messages d'erreurs du compilo ?
+- Gérer les champs de classes inutilisés
